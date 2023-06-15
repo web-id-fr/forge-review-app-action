@@ -98,10 +98,10 @@ runs:
     FORGE_SERVER_ID: ${{ inputs.forge_server_id }}
     ROOT_DOMAIN: ${{ inputs.root_domain }}
     HOST: ${{ inputs.host }}
-    PROJECT_TYPE: ${{ input.project_type }}
-    DIRECTORY: ${{ input.directory }}
-    ISOLATED: ${{ input.isolated }}
-    PHP_VERSION: ${{ input.php_version}}
+    PROJECT_TYPE: ${{ inputs.project_type }}
+    DIRECTORY: ${{ inputs.directory }}
+    ISOLATED: ${{ inputs.isolated }}
+    PHP_VERSION: ${{ inputs.php_version}}
     CREATE_DATABASE: ${{ inputs.create_database }}
     DATABASE_USER: ${{ inputs.database_user }}
     DATABASE_PASSWORD: ${{ inputs.database_password }}
@@ -109,7 +109,7 @@ runs:
     CONFIGURE_REPOSITORY: ${{ inputs.configure_repository }}
     REPOSITORY_PROVIDER: ${{ inputs.repository_provider }}
     REPOSITORY: ${{ inputs.repository }}
-    GITHUB_REPOSITORY: ${{ github.repository }}
+    GITHUB_REPOSITORY: ${{ env.GITHUB_HEAD_REF }}
     BRANCH: ${{ inputs.branch }}
     GITHUB_HEAD_REF: ${{ github.head_ref }}
     COMPOSER: ${{ inputs.composer }}
@@ -118,4 +118,4 @@ runs:
     ENV_STUB_PATH: ${{ inputs.env_stub_path }}
     DEPLOY_SCRIPT_STUB_PATH: ${{ inputs.deploy_script_stub_path }}
     DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
-    GITHUB_RUNNER_DEBUG: ${{ runner.debug }}
+    GITHUB_RUNNER_DEBUG: ${{ env.RUNNER_DEBUG }}
