@@ -109,13 +109,10 @@ runs:
     CONFIGURE_REPOSITORY: ${{ inputs.configure_repository }}
     REPOSITORY_PROVIDER: ${{ inputs.repository_provider }}
     REPOSITORY: ${{ inputs.repository }}
-    GITHUB_REPOSITORY: ${{ env.GITHUB_HEAD_REF }}
     BRANCH: ${{ inputs.branch }}
-    GITHUB_HEAD_REF: ${{ github.head_ref }}
     COMPOSER: ${{ inputs.composer }}
     LETSENCRYPT_CERTIFICATE: ${{ inputs.letsencrypt_certificate }}
     CERTIFICATE_SETUP_TIMEOUT: ${{ inputs.certificate_setup_timeout }}
     ENV_STUB_PATH: ${{ inputs.env_stub_path }}
     DEPLOY_SCRIPT_STUB_PATH: ${{ inputs.deploy_script_stub_path }}
     DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
-    GITHUB_RUNNER_DEBUG: ${{ env.RUNNER_DEBUG }}
