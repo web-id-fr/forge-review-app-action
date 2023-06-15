@@ -93,26 +93,3 @@ outputs:
 runs:
   using: 'docker'
   image: 'Dockerfile'
-  env:
-    FORGE_API_TOKEN: ${{ inputs.forge_api_token }}
-    FORGE_SERVER_ID: ${{ inputs.forge_server_id }}
-    ROOT_DOMAIN: ${{ inputs.root_domain }}
-    HOST: ${{ inputs.host }}
-    PROJECT_TYPE: ${{ inputs.project_type }}
-    DIRECTORY: ${{ inputs.directory }}
-    ISOLATED: ${{ inputs.isolated }}
-    PHP_VERSION: ${{ inputs.php_version}}
-    CREATE_DATABASE: ${{ inputs.create_database }}
-    DATABASE_USER: ${{ inputs.database_user }}
-    DATABASE_PASSWORD: ${{ inputs.database_password }}
-    DATABASE_NAME: ${{ inputs.database_name }}
-    CONFIGURE_REPOSITORY: ${{ inputs.configure_repository }}
-    REPOSITORY_PROVIDER: ${{ inputs.repository_provider }}
-    REPOSITORY: ${{ inputs.repository }}
-    BRANCH: ${{ inputs.branch }}
-    COMPOSER: ${{ inputs.composer }}
-    LETSENCRYPT_CERTIFICATE: ${{ inputs.letsencrypt_certificate }}
-    CERTIFICATE_SETUP_TIMEOUT: ${{ inputs.certificate_setup_timeout }}
-    ENV_STUB_PATH: ${{ inputs.env_stub_path }}
-    DEPLOY_SCRIPT_STUB_PATH: ${{ inputs.deploy_script_stub_path }}
-    DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
