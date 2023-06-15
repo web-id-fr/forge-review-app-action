@@ -1,0 +1,121 @@
+name: 'Forge Review-app Action'
+description: 'Create/update and deploy a review-application to Laravel Forge'
+author: 'rygilles'
+branding:
+  icon: upload-cloud
+  color: green
+inputs:
+  forge_api_token:
+    description: 'Laravel Forge API key'
+    required: true
+  forge_server_id:
+    description: 'Laravel Forge server ID'
+    required: true
+  root_domain:
+    description: 'Root domain under which to create review-app site'
+    required: false
+  host:
+    description: 'Site host of the review-app'
+    required: false
+  project_type:
+    description: 'Project type of the review-app'
+    required: false
+    default: 'php'
+  directory:
+    description: 'Root directory for nginx configuration of the review-app'
+    required: false
+    default: '/public'
+  isolated:
+    description: 'Isolate review-app site'
+    required: false
+    default: 'false'
+  php_version:
+    description: 'PHP version of the review-app site'
+    required: false
+    default: 'php81'
+  create_database:
+    description: 'Create database for review-app'
+    required: false
+    default: 'false'
+  database_user:
+    description: 'Database user of the review-app site'
+    required: false
+    default: 'forge'
+  database_password:
+    description: 'Database password of the review-app site'
+    required: false
+  database_name:
+    description: 'Database name of the review-app site'
+    required: false
+  configure_repository:
+    description: 'Configure repository on review-app site'
+    required: false
+    default: 'true'
+  repository_provider:
+    description: 'Repository provider of review-app site'
+    required: false
+    default: 'github'
+  repository:
+    description: 'Repository of review-app site'
+    required: false
+  branch:
+    description: 'Git branch to use'
+    required: false
+  composer:
+    description: 'Composer install on repository setup'
+    required: false
+    default: 'false'
+  letsencrypt_certificate:
+    description: 'Obtain LetsEncrypt certificate for the review-app site'
+    required: false
+    default: 'true'
+  certificate_setup_timeout:
+    description: 'Maximum wait time in seconds for obtaining the certificate'
+    required: false
+    default: '120'
+  env_stub_path:
+    description: '.env stub file path inside git repository'
+    required: false
+    default: '.github/workflows/.env.stub'
+  deploy_script_stub_path:
+    description: 'Deploy script stub file path inside the git repository'
+    required: false
+    default: '.github/workflows/deploy-script.stub'
+  deployment_timeout:
+    description: 'Maximum wait time in seconds for deploying'
+    required: false
+    default: '120'
+outputs:
+  host:
+    description: 'Host of the review-app (generated or forced one in inputs)'
+  database_name:
+    description: 'Database name of the review-app (generated or forced one in inputs)'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    FORGE_API_TOKEN: ${{ inputs.forge_api_token }}
+    FORGE_SERVER_ID: ${{ inputs.forge_server_id }}
+    ROOT_DOMAIN: ${{ inputs.root_domain }}
+    HOST: ${{ inputs.host }}
+    PROJECT_TYPE: ${{ input.project_type }}
+    DIRECTORY: ${{ input.directory }}
+    ISOLATED: ${{ input.isolated }}
+    PHP_VERSION: ${{ input.php_version}}
+    CREATE_DATABASE: ${{ inputs.create_database }}
+    DATABASE_USER: ${{ inputs.database_user }}
+    DATABASE_PASSWORD: ${{ inputs.database_password }}
+    DATABASE_NAME: ${{ inputs.database_name }}
+    CONFIGURE_REPOSITORY: ${{ inputs.configure_repository }}
+    REPOSITORY_PROVIDER: ${{ inputs.repository_provider }}
+    REPOSITORY: ${{ inputs.repository }}
+    GITHUB_REPOSITORY: ${{ github.repository }}
+    BRANCH: ${{ inputs.branch }}
+    GITHUB_HEAD_REF: ${{ github.head_ref }}
+    COMPOSER: ${{ inputs.composer }}
+    LETSENCRYPT_CERTIFICATE: ${{ inputs.letsencrypt_certificate }}
+    CERTIFICATE_SETUP_TIMEOUT: ${{ inputs.certificate_setup_timeout }}
+    ENV_STUB_PATH: ${{ inputs.env_stub_path }}
+    DEPLOY_SCRIPT_STUB_PATH: ${{ inputs.deploy_script_stub_path }}
+    DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
+    GITHUB_RUNNER_DEBUG: ${{ runner.debug }}
