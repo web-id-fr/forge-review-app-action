@@ -58,12 +58,6 @@ JSON_RESPONSE=$(
 )
 echo "$JSON_RESPONSE" > sites.json
 
-# Display sites if debug mode enabled
-if [[ $GITHUB_RUNNER_DEBUG == 1 ]]; then
-  echo "[DEBUG] sites.json content:"
-  cat sites.json
-fi
-
 # Check if review-app site exists
 SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$HOST"'") // empty' sites.json)
 if [[ ! -z "$SITE_DATA" ]]; then
@@ -514,36 +508,3 @@ else
   echo "$LAST_DEPLOYMENT_OUTPUT"
   exit 1
 fi
-
-#
-#      - name: Slack Notification
-#        uses: rtCamp/action-slack-notify@v2
-#        env:
-#          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-#          SLACK_CHANNEL: '#octools-events'
-#          SLACK_COLOR: '#55FF55'
-#          SLACK_USERNAME: 'github'
-#          SLACK_ICON_EMOJI: ':rocket:'
-#          SLACK_TITLE: Review App Front
-#          SLACK_FOOTER: "“C'est oui.”"
-#          SLACK_MESSAGE: "Review App disponible : - https://${{ steps.review-app-host.outputs.ra_host }}"
-#
-#      - name: PR Comment
-#        uses: unsplash/comment-on-pr@v1.3.0
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          msg: ":rocket: Une Review App pour cette PR est disponible : https://${{ steps.review-app-host.outputs.ra_host }}"
-#
-#      - name: Slack Notification
-#        uses: rtCamp/action-slack-notify@v2
-#        if: ${{ failure() }}
-#        env:
-#          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-#          SLACK_CHANNEL: '#octools-events'
-#          SLACK_COLOR: '#FF5555'
-#          SLACK_USERNAME: 'github'
-#          SLACK_ICON_EMOJI: ':scream:'
-#          SLACK_TITLE: Review App Front
-#          SLACK_FOOTER: "“C'est non.”"
-#          SLACK_MESSAGE: 'La création de la Review App a plantée.'
