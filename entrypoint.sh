@@ -1,48 +1,108 @@
 #!/bin/sh
 set -e
 
-# Prepare vars
+# Prepare vars and default values
 
-if [[ -z "$BRANCH" ]]; then
-  BRANCH=$GITHUB_HEAD_REF
+if [[ -z "$INPUT_BRANCH" ]]; then
+  INPUT_BRANCH=$GITHUB_HEAD_REF
 fi
 
-ESCAPED_BRANCH=$(echo "$BRANCH" | sed -e 's/[^a-z0-9-]/-/g' | tr -s '-')
+ESCAPED_BRANCH=$(echo "$INPUT_BRANCH" | sed -e 's/[^a-z0-9-]/-/g' | tr -s '-')
 
-if [[ -z "$HOST" ]]; then
+if [[ -z "$INPUT_HOST" ]]; then
   # Compute review-app host
-  if [[ -z "$ROOT_DOMAIN" ]]; then
-    HOST=$(echo "$ESCAPED_BRANCH")
+  if [[ -z "$INPUT_ROOT_DOMAIN" ]]; then
+    INPUT_HOST=$(echo "$ESCAPED_BRANCH")
   else
-    HOST=$(echo "$ESCAPED_BRANCH.$ROOT_DOMAIN")
+    INPUT_HOST=$(echo "$ESCAPED_BRANCH.$INPUT_ROOT_DOMAIN")
   fi
 fi
 
-echo "host=$HOST" >> $GITHUB_OUTPUT
-
-if [[ -z "$REPOSITORY" ]]; then
-  REPOSITORY=$GITHUB_REPOSITORY
+if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+  echo "host=$INPUT_HOST" >> $GITHUB_OUTPUT
 fi
 
-if [[ -z "$DATABASE_NAME" ]]; then
+if [[ -z "$INPUT_REPOSITORY" ]]; then
+  INPUT_REPOSITORY=$GITHUB_REPOSITORY
+fi
+
+if [[ -z "$INPUT_DATABASE_NAME" ]]; then
   # Compute database name
-  DATABASE_NAME=$(echo "$ESCAPED_BRANCH" | sed -e 's/[^a-z0-9_]/_/g' | tr -s '_')
+  INPUT_DATABASE_NAME=$(echo "$ESCAPED_BRANCH" | sed -e 's/[^a-z0-9_]/_/g' | tr -s '_')
 fi
 
-echo "database_name=$DATABASE_NAME" >> $GITHUB_OUTPUT
+if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+  echo "database_name=$INPUT_DATABASE_NAME" >> $GITHUB_OUTPUT
+fi
 
-AUTH_HEADER="Authorization: Bearer $FORGE_API_TOKEN"
+AUTH_HEADER="Authorization: Bearer $INPUT_FORGE_API_TOKEN"
+
+if [[ -z "$INPUT_PROJECT_TYPE" ]]; then
+  INPUT_PROJECT_TYPE='php'
+fi
+
+if [[ -z "$INPUT_DIRECTORY" ]]; then
+  INPUT_DIRECTORY='/public'
+fi
+
+if [[ -z "$INPUT_ISOLATED" ]]; then
+  INPUT_ISOLATED='false'
+fi
+
+if [[ -z "$INPUT_PHP_VERSION" ]]; then
+  INPUT_PHP_VERSION='php81'
+fi
+
+if [[ -z "$INPUT_CREATE_DATABASE" ]]; then
+  INPUT_CREATE_DATABASE='false'
+fi
+
+if [[ -z "$INPUT_DATABASE_USER" ]]; then
+  INPUT_DATABASE_USER='forge'
+fi
+
+if [[ -z "$INPUT_CONFIGURE_REPOSITORY" ]]; then
+  INPUT_CONFIGURE_REPOSITORY='true'
+fi
+
+if [[ -z "$INPUT_REPOSITORY_PROVIDER" ]]; then
+  INPUT_REPOSITORY_PROVIDER='github'
+fi
+
+if [[ -z "$INPUT_COMPOSER" ]]; then
+  INPUT_COMPOSER='false'
+fi
+
+if [[ -z "$INPUT_LETSENCRYPT_CERTIFICATE" ]]; then
+  INPUT_LETSENCRYPT_CERTIFICATE='true'
+fi
+
+if [[ -z "$INPUT_CERTIFICATE_SETUP_TIMEOUT" ]]; then
+  INPUT_CERTIFICATE_SETUP_TIMEOUT='120'
+fi
+
+if [[ -z "$INPUT_ENV_STUB_PATH" ]]; then
+  INPUT_ENV_STUB_PATH='.github/workflows/.env.stub'
+fi
+
+if [[ -z "$INPUT_DEPLOY_SCRIPT_STUB_PATH" ]]; then
+  INPUT_DEPLOY_SCRIPT_STUB_PATH='.github/workflows/deploy-script.stub'
+fi
+
+if [[ -z "$INPUT_DEPLOYMENT_TIMEOUT" ]]; then
+  INPUT_DEPLOYMENT_TIMEOUT='120'
+fi
 
 echo ""
 echo "* Check that stubs files exists"
 
-if [ ! -e "/github/workspace/$ENV_STUB_PATH" ]; then
-  echo ".env stub file not found at /github/workspace/$ENV_STUB_PATH"
+if [ ! -e "/github/workspace/$INPUT_ENV_STUB_PATH" ]; then
+  echo ".env stub file not found at /github/workspace/$INPUT_ENV_STUB_PATH"
   exit 1
 fi
 
-if [ ! -e "/github/workspace/$DEPLOY_SCRIPT_STUB_PATH" ]; then
-  echo "Deploy script stub file not found at /github/workspace/$DEPLOY_SCRIPT_STUB_PATH"
+if [ ! -e "/github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH" ]; then
+  echo "Deploy script stub file not found at /github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH"
   exit 1
 fi
 
@@ -50,7 +110,7 @@ echo ".env and deploy script stub files found"
 
 echo ""
 echo '* Get Forge server sites'
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
 JSON_RESPONSE=$(
   curl -s -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -59,14 +119,14 @@ JSON_RESPONSE=$(
 echo "$JSON_RESPONSE" > sites.json
 
 # Check if review-app site exists
-SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$HOST"'") // empty' sites.json)
+SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$INPUT_HOST"'") // empty' sites.json)
 if [[ ! -z "$SITE_DATA" ]]; then
   echo "$SITE_DATA" > site.json
   SITE_ID=$(jq -r '.id' site.json)
   echo "A site (ID $SITE_ID) name match the host"
   RA_FOUND='true'
 else
-  echo "Site $HOST not found"
+  echo "Site $INPUT_HOST not found"
   RA_FOUND='false'
 fi
 
@@ -74,24 +134,24 @@ if [[ $RA_FOUND == 'false' ]]; then
   echo ""
   echo "* Create review-app site"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites"
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
 
-  if [[ $CREATE_DATABASE == 'true' ]]; then
+  if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
     JSON_PAYLOAD='{
-      "domain": "'"$HOST"'",
-      "project_type": "'"$PROJECT_TYPE"'",
-      "directory": "'"$DIRECTORY"'",
-      "isolated": '"$ISOLATED"',
-      "php_version": "'"$PHP_VERSION"'",
-      "database": "'"$DATABASE_NAME"'"
+      "domain": "'"$INPUT_HOST"'",
+      "project_type": "'"$INPUT_PROJECT_TYPE"'",
+      "directory": "'"$INPUT_DIRECTORY"'",
+      "isolated": '"$INPUT_ISOLATED"',
+      "php_version": "'"$INPUT_PHP_VERSION"'",
+      "database": "'"$INPUT_DATABASE_NAME"'"
     }'
   else
     JSON_PAYLOAD='{
-      "domain": "'"$HOST"'",
-      "project_type": "'"$PROJECT_TYPE"'",
-      "directory": "'"$DIRECTORY"'",
-      "isolated": '"$ISOLATED"',
-      "php_version": "'"$PHP_VERSION"'"
+      "domain": "'"$INPUT_HOST"'",
+      "project_type": "'"$INPUT_PROJECT_TYPE"'",
+      "directory": "'"$INPUT_DIRECTORY"'",
+      "isolated": '"$INPUT_ISOLATED"',
+      "php_version": "'"$INPUT_PHP_VERSION"'"
     }'
   fi
 
@@ -111,7 +171,7 @@ if [[ $RA_FOUND == 'false' ]]; then
     echo $(jq '.site' response.json) > site.json
     SITE_ID=$(jq -r '.id' site.json)
 
-    if [[ $CREATE_DATABASE == 'true' ]]; then
+    if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
       echo "New site (ID $SITE_ID) and database created successfully"
     else
       echo "New site (ID $SITE_ID) created successfully"
@@ -124,58 +184,61 @@ if [[ $RA_FOUND == 'false' ]]; then
   fi
 fi
 
-echo ""
-echo "* Check if repository is configured"
-SITE_REPOSITORY=$(jq -r '.repository' site.json)
 
-if [[ $SITE_REPOSITORY == 'null' ]]; then
-  echo "Repository not configured on Forge site"
-  REPOSITORY_CONFIGURED='false'
-else
-  echo "Repository configured on Forge site ($SITE_REPOSITORY)"
-  REPOSITORY_CONFIGURED='true'
-fi
-
-if [[ $REPOSITORY_CONFIGURED == 'false' ]]; then
+if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
   echo ""
-  echo "* Setup git repository on site"
+  echo "* Check if repository is configured"
+  SITE_REPOSITORY=$(jq -r '.repository' site.json)
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/git"
-
-  JSON_PAYLOAD='{
-    "provider": "'"$REPOSITORY_PROVIDER"'",
-    "repository": "'"$REPOSITORY"'",
-    "branch": "'"$BRANCH"'",
-    "composer": '"$COMPOSER"'
-  }'
-
-  HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
-      -X POST \
-      -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      -d "$JSON_PAYLOAD" \
-      "$API_URL"
-  )
-
-  JSON_RESPONSE=$(cat response.json)
-
-  if [[ $HTTP_STATUS -eq 200 ]]; then
-    echo "Git repository configured successfully"
+  if [[ $SITE_REPOSITORY == 'null' ]]; then
+    echo "Repository not configured on Forge site"
+    REPOSITORY_CONFIGURED='false'
   else
-    echo "Failed to setup git repository on Forge site. HTTP status code: $HTTP_STATUS"
-    echo "JSON Response:"
-    echo "$JSON_RESPONSE"
-    exit 1
+    echo "Repository configured on Forge site ($SITE_REPOSITORY)"
+    REPOSITORY_CONFIGURED='true'
+  fi
+
+  if [[ $REPOSITORY_CONFIGURED == 'false' ]]; then
+    echo ""
+    echo "* Setup git repository on site"
+
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/git"
+
+    JSON_PAYLOAD='{
+      "provider": "'"$INPUT_REPOSITORY_PROVIDER"'",
+      "repository": "'"$INPUT_REPOSITORY"'",
+      "branch": "'"$INPUT_BRANCH"'",
+      "composer": '"$INPUT_COMPOSER"'
+    }'
+
+    HTTP_STATUS=$(
+      curl -s -o response.json -w "%{http_code}" \
+        -X POST \
+        -H "$AUTH_HEADER" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        -d "$JSON_PAYLOAD" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat response.json)
+
+    if [[ $HTTP_STATUS -eq 200 ]]; then
+      echo "Git repository configured successfully"
+    else
+      echo "Failed to setup git repository on Forge site. HTTP status code: $HTTP_STATUS"
+      echo "JSON Response:"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
   fi
 fi
 
-if [[ $REPOSITORY_CONFIGURED == 'true' ]]; then
+if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
   echo ""
   echo "* Check if site has a certificate"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/certificates"
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates"
 
   HTTP_STATUS=$(
     curl -s -o response.json -w "%{http_code}" \
@@ -206,10 +269,10 @@ if [[ $REPOSITORY_CONFIGURED == 'true' ]]; then
     echo ""
     echo "* Obtain Let's Encrypt certificate"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/certificates/letsencrypt"
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/letsencrypt"
 
     JSON_PAYLOAD='{
-      "domains": ["'"$HOST"'"]
+      "domains": ["'"$INPUT_HOST"'"]
     }'
 
     HTTP_STATUS=$(
@@ -240,13 +303,13 @@ if [[ $REPOSITORY_CONFIGURED == 'true' ]]; then
     CERTIFICATE_DATA=$(cat certificate.json)
     CERTIFICATE_ID=$(echo "$CERTIFICATE_DATA" | jq -r '.id')
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/certificates/$CERTIFICATE_ID"
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/$CERTIFICATE_ID"
 
     start_time=$(date +%s)
     elapsed_time=0
     status=""
 
-    while [[ "$status" != "installed" && "$elapsed_time" -lt 120 ]]; do
+    while [[ "$status" != "installed" && "$elapsed_time" -lt $INPUT_CERTIFICATE_SETUP_TIMEOUT ]]; do
       HTTP_STATUS=$(
         curl -s -o response.json -w "%{http_code}" \
         -X GET \
@@ -288,17 +351,17 @@ fi
 echo ""
 echo "* Setup .env file"
 
-cp /github/workspace/$ENV_STUB_PATH .env
+cp /github/workspace/$INPUT_ENV_STUB_PATH .env
 
-sed -i -e "s#STUB_HOST#$HOST#" .env
-sed -i -e "s#STUB_DATABASE_NAME#$DATABASE_NAME#" .env
-sed -i -e "s#STUB_DATABASE_USER#$DATABASE_USER#" .env
-sed -i -e "s#STUB_DATABASE_PASSWORD#$DATABASE_PASSWORD#" .env
+sed -i -e "s#STUB_HOST#$INPUT_HOST#" .env
+sed -i -e "s#STUB_DATABASE_NAME#$INPUT_DATABASE_NAME#" .env
+sed -i -e "s#STUB_DATABASE_USER#$INPUT_DATABASE_USER#" .env
+sed -i -e "s#STUB_DATABASE_PASSWORD#$INPUT_DATABASE_PASSWORD#" .env
 
 ENV_CONTENT=$(cat .env)
 ESCAPED_ENV_CONTENT=$(echo "$ENV_CONTENT" | jq -Rsa .)
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/env"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/env"
 
 JSON_PAYLOAD='{
   "content": '"$ESCAPED_ENV_CONTENT"'
@@ -328,14 +391,14 @@ fi
 echo ""
 echo "* Setup deploy script"
 
-cp /github/workspace/$DEPLOY_SCRIPT_STUB_PATH deploy-script
+cp /github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH deploy-script
 
-sed -i -e "s#STUB_HOST#$HOST#" deploy-script
+sed -i -e "s#STUB_HOST#$INPUT_HOST#" deploy-script
 
 DEPLOY_SCRIPT_CONTENT=$(cat deploy-script)
 ESCAPED_DEPLOY_SCRIPT_CONTENT=$(echo "$DEPLOY_SCRIPT_CONTENT" | jq -Rsa .)
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/deployment/script"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment/script"
 
 JSON_PAYLOAD='{
   "content": '"$ESCAPED_DEPLOY_SCRIPT_CONTENT"',
@@ -366,7 +429,7 @@ fi
 echo ""
 echo "* Launch deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/deployment/deploy"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment/deploy"
 
 HTTP_STATUS=$(
   curl -s -o response.json -w "%{http_code}" \
@@ -391,13 +454,13 @@ fi
 echo ""
 echo "* Wait for deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID"
 
 start_time=$(date +%s)
 elapsed_time=0
 status=""
 
-while [[ "$status" != "null" && "$elapsed_time" -lt 60 ]]; do
+while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]; do
   HTTP_STATUS=$(
     curl -s -o response.json -w "%{http_code}" \
     -X GET \
@@ -435,7 +498,7 @@ fi
 echo ""
 echo "* Get last deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/deployment-history"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history"
 
 HTTP_STATUS=$(
 curl -s -o response.json -w "%{http_code}" \
@@ -462,7 +525,7 @@ echo "* Get last deployment output"
 LAST_DEPLOYMENT_DATA=$(cat last-deployment.json)
 LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq '.id')
 
-API_URL="https://forge.laravel.com/api/v1/servers/$FORGE_SERVER_ID/sites/$SITE_ID/deployment-history/$LAST_DEPLOYMENT_ID/output"
+API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history/$LAST_DEPLOYMENT_ID/output"
 
 HTTP_STATUS=$(
   curl -s -o response.json -w "%{http_code}" \
