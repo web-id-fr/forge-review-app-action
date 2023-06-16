@@ -1,7 +1,6 @@
 # Laravel Forge Review App GitHub Action
 
-Deploy your application to [Laravel Forge](https://forge.laravel.com) with GitHub Actions.
-Create/update and deploy a review-application to [Laravel Forge](https://forge.laravel.com) with GitHub action.
+Create/update and deploy a review-application on [Laravel Forge](https://forge.laravel.com) with GitHub action.
 
 ## Inputs
 
