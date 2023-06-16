@@ -2,6 +2,78 @@
 
 Create/update and deploy a review-application on [Laravel Forge](https://forge.laravel.com) with GitHub action.
 
+## Description
+
+This action allows you to automatically create/update and deploy a review-app site on a server managed by Forge when you open a pull-request or push to a branch.
+
+It works in combination with this other action which removes the review-app site when closing the pull-request:
+[web-id-fr/forge-review-app-clean-action](https://github.com/web-id-fr/forge-review-app-clean-action)
+
+### Action running process
+
+All steps are done using [Forge API](https://forge.laravel.com/api-documentation).
+
+- Create site and database if not done yet.
+- Configure repository.
+- Obtain Let's Encrypt certificate.
+- Setup .env file using [stub file](#stub-files).
+- Setup deploy script using [stub file](#stub-files).
+- Launch deployment.
+- Check deployment and display result output.
+
+### Optional inputs variables
+
+The action will determines the name of the site (host) and the database if they are not specified (which is **recommended**).
+
+The `host` is based on the branch name (escaping it with only `a-z0-9-` chars) and the `root_domain`.
+
+For example, a `fix-37` branch with `mydomain.tld` root_domain will result in a `fix-37.mydomain.tld` host.
+
+`database_name` is also based on the branch name (escaping it with only `a-z0-9_` chars).
+
+### About stub files
+<a name="stub-files"></a>
+
+Stub files must be present on the github workspace of your running workflow before call this action.
+
+You can achieve this using the [checkout action](https://github.com/actions/checkout) on a previous step like this:
+
+```yaml
+- name: Checkout stubs file
+  uses: actions/checkout@v3
+  with:
+    sparse-checkout: |
+      .github/workflows/.env.stub
+      .github/workflows/deploy-script.stub
+    sparse-checkout-cone-mode: false
+```
+
+#### .env stub file
+
+You must create stub file at the path `.github/workflows/.env.stub` on your repository and checkout the file before running this action (see `env_stub_path` input below).
+
+This file will be used as a template to generate the real content of the .env of the site, by replacing the following strings:
+
+| String                   | Replacement                          |
+|--------------------------|--------------------------------------|
+| `STUB_HOST`              | Host name of the review-app site.    |
+| `STUB_DATABASE_NAME`     | Database name of the review-app.     |
+| `STUB_DATABASE_USER`     | Database user of the review-app.     |
+| `STUB_DATABASE_PASSWORD` | Database password of the review-app. |
+
+## Deploy script stub file
+
+You must create stub file at the path `.github/workflows/deploy-script.stub` on your repository and checkout the file before running this action (see `deploy_script_stub_path` input below).
+
+This file will be used as a template to generate the real content of the deploy script of the site, by replacing the following strings:
+
+String replacement map:
+
+| String                   | Replacement                          |
+|--------------------------|--------------------------------------|
+| `STUB_HOST`              | Host name of the review-app site.    |
+
+
 ## Inputs
 
 It is highly recommended that you store all inputs using [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets) or variables.
@@ -27,7 +99,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `composer`                  | no       | `false`                                | Composer install on repository setup.                                                                                                       |
 | `letsencrypt_certificate`   | no       | `true`                                 | Obtain LetsEncrypt certificate for the review-app site.                                                                                     |
 | `certificate_setup_timeout` | no       | `120`                                  | Maximum wait time in seconds for obtaining the certificate.                                                                                 |
-| `env_stub_path`             | no       | `.env.example`                         | .env stub file path inside git repository.                                                                                                  |
+| `env_stub_path`             | no       | `.github/workflows/.env.stub`          | .env stub file path inside git repository.                                                                                                  |
 | `deploy_script_stub_path`   | no       | `.github/workflows/deploy-script.stub` | Deploy script stub file path inside the git repository.                                                                                     |
 | `deployment_timeout`        | no       | `120`                                  | Maximum wait time in seconds for deploying.                                                                                                 |
 
@@ -38,24 +110,16 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `host`          | Host of the review-app (generated or forced one in inputs).          |
 | `database_name` | Database name of the review-app (generated or forced one in inputs). |
 
-## .env stub file
+You can easily use those outputs variables to generate a message on your pull-request with this action next:
 
-String replacement map:
-
-| String                   | Replacement                          |
-|--------------------------|--------------------------------------|
-| `STUB_HOST`              | Host name of the review-app site.    |
-| `STUB_DATABASE_NAME`     | Database name of the review-app.     |
-| `STUB_DATABASE_USER`     | Database user of the review-app.     |
-| `STUB_DATABASE_PASSWORD` | Database password of the review-app. |
-
-## Deploy script stub file
-
-String replacement map:
-
-| String                   | Replacement                          |
-|--------------------------|--------------------------------------|
-| `STUB_HOST`              | Host name of the review-app site.    |
+```yaml
+- name: PR Comment
+  uses: unsplash/comment-on-pr@v1.3.0
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  with:
+    msg: ":rocket: Review-app available here: https://${{ steps.forge-review-app.outputs.host }}"
+```
 
 ## Examples
 
