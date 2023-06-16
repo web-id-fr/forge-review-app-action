@@ -6,30 +6,30 @@ Create/update and deploy a review-application on [Laravel Forge](https://forge.l
 
 It is highly recommended that you store all inputs using [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets) or variables.
 
-| Input                       | Required | Default                                | Description                                                                                                                        |
-|-----------------------------|----------|----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `forge_api_token`           | yes      |                                        | Laravel Forge API key.<br>You can generate an API key in your [Forge dashboard](https://forge.laravel.com/user-profile/api).       |
-| `forge_server_id`           | yes      |                                        | Laravel Forge server ID                                                                                                            |
-| `root_domain`               | no       |                                        | Root domain under which to create review-app site.                                                                                 |
-| `host`                      | no       |                                        | Site host of the review-app.<br>The branch name the action is running on will be used to generate it if not defined (recommended). |
-| `project_type`              | no       | `php`                                  | Project type of the review-app.                                                                                                    |
-| `directory`                 | no       | `/public`                              | Root directory for nginx configuration of the review-app.                                                                          |
-| `isolated`                  | no       | `false`                                | Isolate review-app site.                                                                                                           |
-| `php_version`               | no       | `php81`                                | PHP version of the review-app site.                                                                                                |
-| `create_database`           | no       | `false`                                | Create database for review-app.                                                                                                    |
-| `database_user`             | no       | `forge`                                | Database user of the review-app site.                                                                                              |
-| `database_password`         | no       |                                        | Database password of the review-app site.<br>Mandatory if `create_database` is set to `true`                                       |
-| `database_name`             | no       |                                        | Database name of the review-app site.                                                                                              |
-| `configure_repository`      | no       | `true`                                 | Configure repository on review-app site.                                                                                           |
-| `repository_provider`       | no       | `github`                               | Repository provider of review-app site.                                                                                            |
-| `repository`                | no       |                                        | Repository of review-app site.<br>The repository name the action is running on will be used to generate it if not defined.         |
-| `branch`                    | no       |                                        | Git branch to use.<br>The branch name the action is running on will be used to generate it if not defined.                         |
-| `composer`                  | no       | `false`                                | Composer install on repository setup.                                                                                              |
-| `letsencrypt_certificate`   | no       | `true`                                 | Obtain LetsEncrypt certificate for the review-app site.                                                                            |
-| `certificate_setup_timeout` | no       | `120`                                  | Maximum wait time in seconds for obtaining the certificate.                                                                        |
-| `env_stub_path`             | no       | `.env.example`                         | .env stub file path inside git repository.                                                                                         |
-| `deploy_script_stub_path`   | no       | `.github/workflows/deploy-script.stub` | Deploy script stub file path inside the git repository.                                                                            |
-| `deployment_timeout`        | no       | `120`                                  | Maximum wait time in seconds for deploying.                                                                                        |
+| Input                       | Required | Default                                | Description                                                                                                                                 |
+|-----------------------------|----------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `forge_api_token`           | yes      |                                        | Laravel Forge API key.<br>You can generate an API key in your [Forge dashboard](https://forge.laravel.com/user-profile/api).                |
+| `forge_server_id`           | yes      |                                        | Laravel Forge server ID                                                                                                                     |
+| `root_domain`               | no       |                                        | Root domain under which to create review-app site.                                                                                          |
+| `host`                      | no       |                                        | Site host of the review-app.<br>The branch name the action is running on will be used to generate it if not defined (recommended).          |
+| `project_type`              | no       | `php`                                  | Project type of the review-app.                                                                                                             |
+| `directory`                 | no       | `/public`                              | Root directory for nginx configuration of the review-app.                                                                                   |
+| `isolated`                  | no       | `false`                                | Isolate review-app site.                                                                                                                    |
+| `php_version`               | no       | `php81`                                | PHP version of the review-app site.                                                                                                         |
+| `create_database`           | no       | `false`                                | Create database for review-app.                                                                                                             |
+| `database_user`             | no       | `forge`                                | Database user of the review-app site.                                                                                                       |
+| `database_password`         | no       |                                        | Database password of the review-app site.<br>Mandatory if `create_database` is set to `true`                                                |
+| `database_name`             | no       |                                        | Database name of the review-app site.<br>The branch name the action is running on will be used to generate it if not defined (recommended). |
+| `configure_repository`      | no       | `true`                                 | Configure repository on review-app site.                                                                                                    |
+| `repository_provider`       | no       | `github`                               | Repository provider of review-app site.                                                                                                     |
+| `repository`                | no       |                                        | Repository of review-app site.<br>The repository name the action is running on will be used to generate it if not defined.                  |
+| `branch`                    | no       |                                        | Git branch to use.<br>The branch name the action is running on will be used to generate it if not defined.                                  |
+| `composer`                  | no       | `false`                                | Composer install on repository setup.                                                                                                       |
+| `letsencrypt_certificate`   | no       | `true`                                 | Obtain LetsEncrypt certificate for the review-app site.                                                                                     |
+| `certificate_setup_timeout` | no       | `120`                                  | Maximum wait time in seconds for obtaining the certificate.                                                                                 |
+| `env_stub_path`             | no       | `.env.example`                         | .env stub file path inside git repository.                                                                                                  |
+| `deploy_script_stub_path`   | no       | `.github/workflows/deploy-script.stub` | Deploy script stub file path inside the git repository.                                                                                     |
+| `deployment_timeout`        | no       | `120`                                  | Maximum wait time in seconds for deploying.                                                                                                 |
 
 ## Outputs
 
