@@ -74,7 +74,6 @@ jobs:
     name: "Create or update Forge review-app"
 
     steps:
-      # Trigger Laravel Forge Deploy
       - name: Deploy
         uses: web-id-fr/forge-review-app-action@v1.0.0
         with:
