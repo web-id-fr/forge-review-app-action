@@ -123,6 +123,11 @@ SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$INPUT_HOST"'") // empty' sites
 if [[ ! -z "$SITE_DATA" ]]; then
   echo "$SITE_DATA" > site.json
   SITE_ID=$(jq -r '.id' site.json)
+
+  if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+    echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
+  fi
+
   echo "A site (ID $SITE_ID) name match the host"
   RA_FOUND='true'
 else
@@ -171,6 +176,10 @@ if [[ $RA_FOUND == 'false' ]]; then
     echo $(jq '.site' response.json) > site.json
     SITE_ID=$(jq -r '.id' site.json)
 
+    if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+      echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
+    fi
+
     if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
       echo "New site (ID $SITE_ID) and database created successfully"
     else
@@ -183,7 +192,6 @@ if [[ $RA_FOUND == 'false' ]]; then
     exit 1
   fi
 fi
-
 
 if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
   echo ""
