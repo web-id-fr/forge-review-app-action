@@ -109,6 +109,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 |-----------------|----------------------------------------------------------------------|
 | `host`          | Host of the review-app (generated or forced one in inputs).          |
 | `database_name` | Database name of the review-app (generated or forced one in inputs). |
+| `site_id`       | Forge site ID of the review-app.                                     |
 
 You can easily use those outputs variables to generate a message on your pull-request with this action next:
 
