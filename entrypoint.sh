@@ -29,6 +29,9 @@ fi
 if [[ -z "$INPUT_DATABASE_NAME" ]]; then
   # Compute database name
   INPUT_DATABASE_NAME=$(echo "$ESCAPED_BRANCH" | sed -e 's/[^a-z0-9_]/_/g' | tr -s '_')
+
+  # Limit to 64 chars max
+  INPUT_DATABASE_NAME="${INPUT_DATABASE_NAME:0:64}"
 fi
 
 if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
