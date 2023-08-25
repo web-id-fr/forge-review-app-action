@@ -13,8 +13,16 @@ if [[ -z "$INPUT_HOST" ]]; then
   # Compute review-app host
   if [[ -z "$INPUT_ROOT_DOMAIN" ]]; then
     INPUT_HOST=$(echo "$ESCAPED_BRANCH")
+
+    # Limit to 64 chars max
+    INPUT_HOST="${INPUT_HOST:0:64}"
   else
     INPUT_HOST=$(echo "$ESCAPED_BRANCH.$INPUT_ROOT_DOMAIN")
+
+    # Limit to 64 chars max
+    if [ ${#INPUT_HOST} -gt 64 ]; then
+      INPUT_HOST=$(echo "${ESCAPED_BRANCH:0:$((${#ESCAPED_BRANCH} - $((${#INPUT_HOST} - 64))))}.$INPUT_ROOT_DOMAIN")
+    fi
   fi
 fi
 
