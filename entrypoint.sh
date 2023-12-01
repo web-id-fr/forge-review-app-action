@@ -9,6 +9,11 @@ fi
 
 ESCAPED_BRANCH=$(echo "$INPUT_BRANCH" | sed -e 's/[^a-z0-9-]/-/g' | tr -s '-')
 
+# Remove the trailing "-" character
+if [[ $ESCAPED_BRANCH == *- ]]; then
+    ESCAPED_BRANCH="${ESCAPED_BRANCH%-}"
+fi
+
 if [[ -z "$INPUT_HOST" ]]; then
   # Compute review-app host
   if [[ -z "$INPUT_ROOT_DOMAIN" ]]; then
