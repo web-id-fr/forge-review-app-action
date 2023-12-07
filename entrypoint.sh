@@ -21,12 +21,22 @@ if [[ -z "$INPUT_HOST" ]]; then
 
     # Limit to 64 chars max
     INPUT_HOST="${INPUT_HOST:0:64}"
+
+    # Remove the trailing "-" character
+    if [[ $INPUT_HOST == *- ]]; then
+        INPUT_HOST="${INPUT_HOST%-}"
+    fi
   else
     INPUT_HOST=$(echo "$ESCAPED_BRANCH.$INPUT_ROOT_DOMAIN")
 
     # Limit to 64 chars max
     if [ ${#INPUT_HOST} -gt 64 ]; then
       INPUT_HOST=$(echo "${ESCAPED_BRANCH:0:$((${#ESCAPED_BRANCH} - $((${#INPUT_HOST} - 64))))}.$INPUT_ROOT_DOMAIN")
+    fi
+
+    # Remove dash in middle of the host
+    if [[ $INPUT_HOST == *-.$INPUT_ROOT_DOMAIN ]]; then
+        INPUT_HOST=$(echo $INPUT_HOST | sed "s/-\.$INPUT_ROOT_DOMAIN/\.$INPUT_ROOT_DOMAIN/")
     fi
   fi
 fi
