@@ -3,6 +3,14 @@ set -e
 
 # Prepare vars and default values
 
+if [[ -z "$DEBUG" ]]; then
+  DEBUG='false'
+fi
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "!!! DEBUG MODE ENABLED !!!"
+fi
+
 if [[ -z "$INPUT_BRANCH" ]]; then
   INPUT_BRANCH=$GITHUB_HEAD_REF
 fi
@@ -137,12 +145,24 @@ echo ".env and deploy script stub files found"
 echo ""
 echo '* Get Forge server sites'
 API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL GET on $API_URL"
+  echo ""
+fi
+
 JSON_RESPONSE=$(
   curl -s -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
     "$API_URL"
 )
 echo "$JSON_RESPONSE" > sites.json
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo $JSON_RESPONSE
+  echo ""
+fi
 
 # Check if review-app site exists
 SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$INPUT_HOST"'") // empty' sites.json)
@@ -186,6 +206,12 @@ if [[ $RA_FOUND == 'false' ]]; then
     }'
   fi
 
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL POST on $API_URL with payload :"
+    echo $JSON_PAYLOAD
+    echo ""
+  fi
+
   HTTP_STATUS=$(
     curl -s -o response.json -w "%{http_code}" \
       -X POST \
@@ -197,6 +223,12 @@ if [[ $RA_FOUND == 'false' ]]; then
   )
 
   JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
 
   if [[ $HTTP_STATUS -eq 200 ]]; then
     echo $(jq '.site' response.json) > site.json
@@ -245,6 +277,12 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
       "composer": '"$INPUT_COMPOSER"'
     }'
 
+    if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] CURL POST on $API_URL with payload :"
+        echo $JSON_PAYLOAD
+        echo ""
+      fi
+
     HTTP_STATUS=$(
       curl -s -o response.json -w "%{http_code}" \
         -X POST \
@@ -256,6 +294,12 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
     )
 
     JSON_RESPONSE=$(cat response.json)
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] response JSON:"
+      echo $JSON_RESPONSE
+      echo ""
+    fi
 
     if [[ $HTTP_STATUS -eq 200 ]]; then
       echo "Git repository configured successfully"
@@ -274,6 +318,11 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
   API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates"
 
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL GET on $API_URL"
+    echo ""
+  fi
+
   HTTP_STATUS=$(
     curl -s -o response.json -w "%{http_code}" \
     -X GET \
@@ -282,6 +331,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     -H "Content-Type: application/json" \
     "$API_URL"
   )
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    cat response.json
+    echo ""
+  fi
 
   if [[ $HTTP_STATUS -eq 200 ]]; then
     echo "Fetched site certificates successfully"
@@ -309,6 +364,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       "domains": ["'"$INPUT_HOST"'"]
     }'
 
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL POST on $API_URL with payload :"
+      echo $JSON_PAYLOAD
+      echo ""
+    fi
+
     HTTP_STATUS=$(
       curl -s -o response.json -w "%{http_code}" \
         -X POST \
@@ -320,6 +381,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     )
 
     JSON_RESPONSE=$(cat response.json)
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] response JSON:"
+      echo $JSON_RESPONSE
+      echo ""
+    fi
 
     if [[ $HTTP_STATUS -eq 200 ]]; then
       echo "Request for a let's encrypt certificate sent successfully"
@@ -344,6 +411,11 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     status=""
 
     while [[ "$status" != "installed" && "$elapsed_time" -lt $INPUT_CERTIFICATE_SETUP_TIMEOUT ]]; do
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] CURL GET on $API_URL "
+        echo ""
+      fi
+
       HTTP_STATUS=$(
         curl -s -o response.json -w "%{http_code}" \
         -X GET \
@@ -354,6 +426,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       )
 
       JSON_RESPONSE=$(cat response.json)
+
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] response JSON:"
+        echo $JSON_RESPONSE
+        echo ""
+      fi
 
       if [[ "$HTTP_STATUS" != "200" ]]; then
         echo "Response code is not 200 but $HTTP_STATUS"
@@ -387,19 +465,44 @@ echo "* Setup .env file"
 
 cp /github/workspace/$INPUT_ENV_STUB_PATH .env
 
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] Stub .env file content:"
+  cat .env
+  echo ""
+fi
+
 sed -i -e "s#STUB_HOST#$INPUT_HOST#" .env
 sed -i -e "s#STUB_DATABASE_NAME#$INPUT_DATABASE_NAME#" .env
 sed -i -e "s#STUB_DATABASE_USER#$INPUT_DATABASE_USER#" .env
 sed -i -e "s#STUB_DATABASE_PASSWORD#$INPUT_DATABASE_PASSWORD#" .env
 
 ENV_CONTENT=$(cat .env)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] Generated .env file content:"
+  echo $ENV_CONTENT
+  echo ""
+fi
+
 ESCAPED_ENV_CONTENT=$(echo "$ENV_CONTENT" | jq -Rsa .)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] Escaped .env file content:"
+  echo $ESCAPED_ENV_CONTENT
+  echo ""
+fi
 
 API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/env"
 
 JSON_PAYLOAD='{
   "content": '"$ESCAPED_ENV_CONTENT"'
 }'
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL POST on $API_URL with payload :"
+  echo $JSON_PAYLOAD
+  echo ""
+fi
 
 HTTP_STATUS=$(
   curl -s -o response.json -w "%{http_code}" \
@@ -412,6 +515,12 @@ HTTP_STATUS=$(
 )
 
 JSON_RESPONSE=$(cat response.json)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo $JSON_RESPONSE
+  echo ""
+fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo ".env file updated successfully"
@@ -439,6 +548,12 @@ JSON_PAYLOAD='{
   "auto_source": true
 }'
 
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL POST on $API_URL with payload :"
+  echo $JSON_PAYLOAD
+  echo ""
+fi
+
 HTTP_STATUS=$(
   curl -s -o response.json -w "%{http_code}" \
     -X PUT \
@@ -450,6 +565,12 @@ HTTP_STATUS=$(
 )
 
 JSON_RESPONSE=$(cat response.json)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo $JSON_RESPONSE
+  echo ""
+fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Deployment script updated successfully"
@@ -474,7 +595,19 @@ HTTP_STATUS=$(
     "$API_URL"
 )
 
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL POST on $API_URL with payload :"
+  echo $JSON_PAYLOAD
+  echo ""
+fi
+
 JSON_RESPONSE=$(cat response.json)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo $JSON_RESPONSE
+  echo ""
+fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Deployment launched successfully"
@@ -495,6 +628,11 @@ elapsed_time=0
 status=""
 
 while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]; do
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL GET on $API_URL"
+    echo ""
+  fi
+
   HTTP_STATUS=$(
     curl -s -o response.json -w "%{http_code}" \
     -X GET \
@@ -505,6 +643,12 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
   )
 
   JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
 
   if [[ "$HTTP_STATUS" != "200" ]]; then
     echo "Response code is not 200 but $HTTP_STATUS"
@@ -534,6 +678,11 @@ echo "* Get last deployment"
 
 API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history"
 
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL GET on $API_URL"
+  echo ""
+fi
+
 HTTP_STATUS=$(
 curl -s -o response.json -w "%{http_code}" \
   -X GET \
@@ -542,6 +691,12 @@ curl -s -o response.json -w "%{http_code}" \
   -H "Content-Type: application/json" \
   "$API_URL"
 )
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  cat response.json
+  echo ""
+fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Fetched last deployment successfully "
@@ -561,6 +716,11 @@ LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq '.id')
 
 API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history/$LAST_DEPLOYMENT_ID/output"
 
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] CURL GET on $API_URL"
+  echo ""
+fi
+
 HTTP_STATUS=$(
   curl -s -o response.json -w "%{http_code}" \
     -X GET \
@@ -571,6 +731,12 @@ HTTP_STATUS=$(
 )
 
 JSON_RESPONSE=$(cat response.json)
+
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo $JSON_RESPONSE
+  echo ""
+fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Fetched last deployment output successfully "
