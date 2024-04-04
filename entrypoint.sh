@@ -549,7 +549,7 @@ API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$
 
 JSON_PAYLOAD='{
   "content": '"$ESCAPED_DEPLOY_SCRIPT_CONTENT"',
-  "auto_source": '"$INPUT_DEPLOYMENT_AUTO_SOURCE"'
+  "auto_source": '$INPUT_DEPLOYMENT_AUTO_SOURCE'
 }'
 
 if [[ $DEBUG == 'true' ]]; then
