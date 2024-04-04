@@ -102,6 +102,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `env_stub_path`             | no       | `.github/workflows/.env.stub`          | .env stub file path inside git repository.                                                                                                  |
 | `deploy_script_stub_path`   | no       | `.github/workflows/deploy-script.stub` | Deploy script stub file path inside the git repository.                                                                                     |
 | `deployment_timeout`        | no       | `120`                                  | Maximum wait time in seconds for deploying.                                                                                                 |
+| `deployment_auto_source`    | no       | `true`                                 | Whether to automatically source environment variables into the deployment script.                                                           |
 
 ## Outputs
 

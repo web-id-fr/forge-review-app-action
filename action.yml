@@ -85,6 +85,10 @@ inputs:
     description: 'Maximum wait time in seconds for deploying'
     required: false
     default: '120'
+  deployment_auto_source:
+    description: 'Whether to automatically source environment variables into the deployment script'
+    required: false
+    default: 'true'
 outputs:
   host:
     description: 'Host of the review-app (generated or forced one in inputs)'
