@@ -22,6 +22,14 @@ if [[ $ESCAPED_BRANCH == *- ]]; then
     ESCAPED_BRANCH="${ESCAPED_BRANCH%-}"
 fi
 
+if [[ -z "$INPUT_PREFIX_WITH_PR_NUMBER" ]]; then
+  INPUT_PREFIX_WITH_PR_NUMBER='true'
+fi
+
+if [[ $INPUT_PREFIX_WITH_PR_NUMBER == 'true' ]]; then
+  ESCAPED_BRANCH=$(echo "$INPUT_PR_NUMBER-$ESCAPED_BRANCH")
+fi
+
 if [[ -z "$INPUT_HOST" ]]; then
   # Compute review-app host
   if [[ -z "$INPUT_ROOT_DOMAIN" ]]; then
