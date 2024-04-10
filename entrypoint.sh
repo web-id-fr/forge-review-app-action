@@ -27,7 +27,7 @@ if [[ -z "$INPUT_PREFIX_WITH_PR_NUMBER" ]]; then
 fi
 
 if [[ $INPUT_PREFIX_WITH_PR_NUMBER == 'true' ]]; then
-  PR_NUMBER=$(echo "$GITHUB_REF_NAME" | grep -P '[0-9]+/merge')
+  PR_NUMBER=$(echo "$GITHUB_REF_NAME" | grep -oE '[0-9]+')
   ESCAPED_BRANCH=$(echo "$PR_NUMBER-$ESCAPED_BRANCH")
 fi
 
