@@ -51,6 +51,8 @@ inputs:
   database_name:
     description: 'Database name of the review-app site'
     required: false
+  database_name_prefix:
+    description: 'Database name prefix, useful for PostgreSQL that does not support digits (PR number) for first chars'
   configure_repository:
     description: 'Configure repository on review-app site'
     required: false
