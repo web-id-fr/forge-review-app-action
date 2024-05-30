@@ -105,6 +105,17 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `deploy_script_stub_path`   | no       | `.github/workflows/deploy-script.stub` | Deploy script stub file path inside the git repository.                                                                                     |
 | `deployment_timeout`        | no       | `120`                                  | Maximum wait time in seconds for deploying.                                                                                                 |
 | `deployment_auto_source`    | no       | `true`                                 | Whether to automatically source environment variables into the deployment script.                                                           |
+| `create_worker`             | no       | `false`                                | Create site worker.                                                                                                                         |
+| `worker_connection`         | no       | `redis`                                | Worker connection (if creation is requested).                                                                                               |
+| `worker_timeout`            | no       | `90`                                   | Worker timeout in seconds (if creation is requested).                                                                                       |
+| `worker_sleep`              | no       | `60`                                   | Worker sleep time in seconds (if creation is requested).                                                                                    |
+| `worker_tries`              | no       |                                        | Worker maximum tries (if creation is requested).                                                                                            |
+| `worker_processes`          | no       | `1`                                    | Worker processes (if creation is requested).                                                                                                |
+| `worker_stopwaitsecs`       | no       | `600`                                  | Worker stop wait secs (if creation is requested).                                                                                           |
+| `worker_php_version`        | no       |                                        | Worker PHP version (if creation is requested). `php_version` input value will be used if not defined.                                       |
+| `worker_daemon`             | no       | `true`                                 | Worker "daemon" (if creation is requested).                                                                                                 |
+| `worker_force`              | no       | `false`                                | Worker "force" (if creation is requested).                                                                                                  |
+
 
 ## Outputs
 
