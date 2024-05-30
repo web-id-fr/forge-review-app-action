@@ -144,6 +144,42 @@ if [[ -z "$INPUT_DEPLOYMENT_AUTO_SOURCE" ]]; then
   INPUT_DEPLOYMENT_AUTO_SOURCE='true'
 fi
 
+if [[ -z "$INPUT_CREATE_WORKER" ]]; then
+  INPUT_CREATE_WORKER='false'
+fi
+
+if [[ -z "$INPUT_WORKER_CONNECTION" ]]; then
+  INPUT_WORKER_CONNECTION='redis'
+fi
+
+if [[ -z "$INPUT_WORKER_TIMEOUT" ]]; then
+  INPUT_WORKER_TIMEOUT='90'
+fi
+
+if [[ -z "$INPUT_WORKER_SLEEP" ]]; then
+  INPUT_WORKER_SLEEP='60'
+fi
+
+if [[ -z "$INPUT_WORKER_PROCESSES" ]]; then
+  INPUT_WORKER_PROCESSES='1'
+fi
+
+if [[ -z "$INPUT_WORKER_STOPWAITSECS" ]]; then
+  INPUT_WORKER_STOPWAITSECS='600'
+fi
+
+if [[ -z "$INPUT_WORKER_PHP_VERSION" ]]; then
+  INPUT_WORKER_PHP_VERSION=$INPUT_PHP_VERSION
+fi
+
+if [[ -z "$INPUT_WORKER_DAEMON" ]]; then
+  INPUT_WORKER_DAEMON='true'
+fi
+
+if [[ -z "$INPUT_WORKER_FORCE" ]]; then
+  INPUT_WORKER_FORCE='false'
+fi
+
 echo ""
 echo "* Check that stubs files exists"
 
@@ -787,4 +823,227 @@ else
   echo ""
   echo "$LAST_DEPLOYMENT_OUTPUT"
   exit 1
+fi
+
+if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
+  echo ""
+  echo '* Get Forge server site workers'
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers"
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL GET on $API_URL"
+    echo ""
+  fi
+
+  JSON_RESPONSE=$(
+    curl -s -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      "$API_URL"
+  )
+  echo "$JSON_RESPONSE" > workers.json
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
+
+  # Check if worker exists
+  WORKER_EXISTS=$(jq -r '(.workers | length) > 0' workers.json)
+
+  if [[ $WORKER_EXISTS == 'false' ]]; then
+    echo "Worker not found"
+  fi
+
+  if [[ $WORKER_EXISTS == 'true' ]]; then
+    echo "Worker found"
+    echo ""
+    echo "* Checking review-app worker configuration"
+    echo ""
+
+    FIRST_WORKER_DATA=$(jq -r '.workers[0]' workers.json)
+
+    echo "$FIRST_WORKER_DATA" > first_worker.json
+    WORKER_ID=$(jq -r '.id' first_worker.json)
+
+    if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+      echo "worker_id=WORKER_ID" >> $GITHUB_OUTPUT
+    fi
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] first worker DATA JSON:"
+      echo $FIRST_WORKER_DATA
+      echo ""
+    fi
+
+    echo "Checking worker (ID $WORKER_ID)"
+    echo "⚠️ PHP version is not checked, in case of update, delete and recreate the review app manually."
+
+    WORKER_CONNECTION_ID=$(jq -r '.connection' first_worker.json)
+    WORKER_TIMEOUT=$(jq -r '.timeout' first_worker.json)
+    WORKER_SLEEP=$(jq -r '.sleep' first_worker.json)
+    WORKER_PROCESSES=$(jq -r '.processes' first_worker.json)
+    WORKER_STOPWAITSECS=$(jq -r '.stopwaitsecs' first_worker.json)
+    WORKER_DAEMON=$(jq -r '.daemon' first_worker.json)
+    WORKER_TRIES=$(jq -r '.tries' first_worker.json)
+
+    if [[ "$WORKER_DAEMON" == "1" ]]; then
+      WORKER_DAEMON='true'
+    else
+      WORKER_DAEMON='false'
+    fi
+
+    WORKER_FORCE=$(jq -r '.force' first_worker.json)
+
+    if [[ "$WORKER_FORCE" == "1" ]]; then
+      WORKER_FORCE='true'
+    else
+      WORKER_FORCE='false'
+    fi
+
+    NEED_WORKER_RECREATE='false'
+
+    if [[ "$INPUT_WORKER_CONNECTION" != "$WORKER_CONNECTION_ID" ]]; then
+      echo "Existing worker connection '$WORKER_CONNECTION_ID' is different than the requested '$INPUT_WORKER_CONNECTION' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ "$INPUT_WORKER_TIMEOUT" != "$WORKER_TIMEOUT" ]]; then
+      echo "Existing worker timeout '$WORKER_TIMEOUT' is different than the requested '$INPUT_WORKER_TIMEOUT' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ "$INPUT_WORKER_PROCESSES" != "$WORKER_PROCESSES" ]]; then
+      echo "Existing worker processes '$WORKER_PROCESSES' is different than the requested '$INPUT_WORKER_PROCESSES' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ "$INPUT_WORKER_STOPWAITSECS" != "$WORKER_STOPWAITSECS" ]]; then
+      echo "Existing worker stopwaitsecs '$WORKER_STOPWAITSECS' is different than the requested '$INPUT_WORKER_STOPWAITSECS' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ "$INPUT_WORKER_DAEMON" != "$WORKER_DAEMON" ]]; then
+      echo "Existing worker daemon '$WORKER_DAEMON' is different than the requested '$INPUT_WORKER_DAEMON' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ "$INPUT_WORKER_FORCE" != "$WORKER_FORCE" ]]; then
+      echo "Existing worker force '$WORKER_FORCE' is different than the requested '$INPUT_WORKER_FORCE' value"
+      NEED_WORKER_RECREATE='true'
+    fi
+
+    if [[ -z "$INPUT_WORKER_TRIES" ]]; then
+      if [[ "null" != "$WORKER_TRIES" ]]; then
+        echo "Existing worker tries '$WORKER_TRIES' is different than the requested 'null' value"
+        NEED_WORKER_RECREATE='true'
+      fi
+    else
+      if [[ "$INPUT_WORKER_TRIES" != "$WORKER_TRIES" ]]; then
+        echo "Existing worker tries '$WORKER_TRIES' is different than the requested '$INPUT_WORKER_TRIES' value"
+        NEED_WORKER_RECREATE='true'
+      fi
+    fi
+
+    if [[ $NEED_WORKER_RECREATE == 'true' ]]; then
+      echo ""
+      echo "* Delete existing review-app worker"
+
+      API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers/$WORKER_ID"
+
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] CURL DELETE on $API_URL"
+        echo ""
+      fi
+
+      HTTP_STATUS=$(
+        curl -s -o response.json -w "%{http_code}" \
+          -X DELETE \
+          -H "$AUTH_HEADER" \
+          -H "Accept: application/json" \
+          -H "Content-Type: application/json" \
+          -d "$JSON_PAYLOAD" \
+          "$API_URL"
+      )
+
+      JSON_RESPONSE=$(cat response.json)
+
+      if [[ $HTTP_STATUS -eq 200 ]]; then
+        echo "Worker (ID $WORKER_ID) deleted successfully"
+        WORKER_EXISTS='false'
+      else
+        echo "Failed to delete worker (ID $WORKER_ID). HTTP status code: $HTTP_STATUS"
+        echo "JSON Response:"
+        echo "$JSON_RESPONSE"
+        exit 1
+      fi
+    fi
+  fi
+
+  if [[ $WORKER_EXISTS == 'false' ]]; then
+    echo ""
+    echo "* Create review-app worker"
+
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers"
+
+    JSON_PAYLOAD='{'
+
+    if [[ -n "$INPUT_WORKER_TRIES" ]]; then
+      JSON_PAYLOAD=$JSON_PAYLOAD'
+        "tries": '$INPUT_WORKER_TRIES','
+    fi
+
+    if [[ -n "$INPUT_WORKER_PHP_VERSION" ]]; then
+      JSON_PAYLOAD=$JSON_PAYLOAD'
+        "php_version": "'$INPUT_WORKER_PHP_VERSION'",'
+    fi
+
+    if [[ -n "$INPUT_WORKER_QUEUE" ]]; then
+      JSON_PAYLOAD=$JSON_PAYLOAD'
+        "queue": "'$INPUT_WORKER_QUEUE'",'
+    fi
+
+    JSON_PAYLOAD=$JSON_PAYLOAD'
+      "connection": "'"$INPUT_WORKER_CONNECTION"'",
+      "timeout": '$INPUT_WORKER_TIMEOUT',
+      "sleep": '$INPUT_WORKER_SLEEP',
+      "processes": '$INPUT_WORKER_PROCESSES',
+      "stopwaitsecs": '$INPUT_WORKER_STOPWAITSECS',
+      "daemon": '$INPUT_WORKER_DAEMON',
+      "force": '$INPUT_WORKER_FORCE'
+    }'
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL POST on $API_URL with payload :"
+      echo $JSON_PAYLOAD
+      echo ""
+    fi
+
+    HTTP_STATUS=$(
+      curl -s -o response.json -w "%{http_code}" \
+        -X POST \
+        -H "$AUTH_HEADER" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        -d "$JSON_PAYLOAD" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat response.json)
+    if [[ $HTTP_STATUS -eq 200 ]]; then
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] response JSON:"
+        echo $JSON_RESPONSE
+        echo ""
+      fi
+    else
+      echo "Failed to create worker. HTTP status code: $HTTP_STATUS"
+      echo "JSON Response:"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
+
+    WORKER_ID=$(jq -r '.worker.id' response.json)
+    echo "Worker (ID $WORKER_ID) created successfully"
+  fi
 fi
