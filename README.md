@@ -115,6 +115,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `worker_php_version`        | no       |                                        | Worker PHP version (if creation is requested). `php_version` input value will be used if not defined.                                       |
 | `worker_daemon`             | no       | `true`                                 | Worker "daemon" (if creation is requested).                                                                                                 |
 | `worker_force`              | no       | `false`                                | Worker "force" (if creation is requested).                                                                                                  |
+| `worker_queue`              | no       |                                        | Worker queue (if creation is requested). Default queue will be used if not defined.                                                         |
 
 
 ## Outputs
