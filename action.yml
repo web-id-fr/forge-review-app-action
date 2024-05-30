@@ -95,6 +95,48 @@ inputs:
     description: 'Whether to automatically source environment variables into the deployment script'
     required: false
     default: 'true'
+  create_worker:
+    description: 'Create site worker'
+    required: false
+    default: 'false'
+  worker_connection:
+    description: 'Worker connection (if creation is requested)'
+    required: false
+    default: 'redis'
+  worker_timeout:
+    description: 'Worker timeout in seconds (if creation is requested)'
+    required: false
+    default: '90'
+  worker_sleep:
+    description: 'Worker sleep in seconds (if creation is requested)'
+    required: false
+    default: '60'
+  worker_tries:
+    description: 'Worker maximum tries (if creation is requested)'
+    required: false
+  worker_processes:
+    description: 'Worker processes (if creation is requested)'
+    required: false
+    default: '1'
+  worker_stopwaitsecs:
+    description: 'Worker stop wait secs (if creation is requested)'
+    required: false
+    default: '600'
+  worker_php_version:
+    description: 'Worker PHP version (if creation is requested). `php_version` input value will be used if not defined'
+    required: false
+  worker_daemon:
+    description: 'Worker "daemon" (if creation is requested)'
+    required: false
+    default: 'true'
+  worker_force:
+    description: 'Worker "force" (if creation is requested)'
+    required: false
+    default: 'false'
+  worker_queue:
+    description: 'Worker queue (if creation is requested). Default queue will be used if not defined.'
+    required: false
+
 outputs:
   host:
     description: 'Host of the review-app (generated or forced one in inputs)'
