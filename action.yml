@@ -21,6 +21,9 @@ inputs:
     description: 'Use the pull-request number as host and database prefix when host is not manually defined'
     required: false
     default: 'true'
+  fqdn_prefix:
+    description: 'Prefix the whole FQDN (e.g.: "app.")'
+    required: false
   project_type:
     description: 'Project type of the review-app'
     required: false
