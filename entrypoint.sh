@@ -249,22 +249,45 @@ if [[ $RA_FOUND == 'false' ]]; then
   API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
 
   if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
-    JSON_PAYLOAD='{
-      "domain": "'"$INPUT_HOST"'",
-      "project_type": "'"$INPUT_PROJECT_TYPE"'",
-      "directory": "'"$INPUT_DIRECTORY"'",
-      "isolated": '"$INPUT_ISOLATED"',
-      "php_version": "'"$INPUT_PHP_VERSION"'",
-      "database": "'"$INPUT_DATABASE_NAME"'"
-    }'
+    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "database": "'"$INPUT_DATABASE_NAME"'"
+      }'
+    else
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "database": "'"$INPUT_DATABASE_NAME"'",
+        "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
+      }'
+    fi
   else
-    JSON_PAYLOAD='{
-      "domain": "'"$INPUT_HOST"'",
-      "project_type": "'"$INPUT_PROJECT_TYPE"'",
-      "directory": "'"$INPUT_DIRECTORY"'",
-      "isolated": '"$INPUT_ISOLATED"',
-      "php_version": "'"$INPUT_PHP_VERSION"'"
-    }'
+    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'"
+      }'
+    else
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
+      }'
+    fi
   fi
 
   if [[ $DEBUG == 'true' ]]; then
