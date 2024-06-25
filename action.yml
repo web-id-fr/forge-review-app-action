@@ -56,6 +56,9 @@ inputs:
     required: false
   database_name_prefix:
     description: 'Database name prefix, useful for PostgreSQL that does not support digits (PR number) for first chars'
+  nginx_template:
+    description: 'Nginx template to use (default template if not defined)'
+    required: false
   configure_repository:
     description: 'Configure repository on review-app site'
     required: false
