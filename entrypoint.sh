@@ -32,40 +32,42 @@ if [[ $INPUT_PREFIX_WITH_PR_NUMBER == 'true' ]]; then
 fi
 
 if [[ -z "$INPUT_HOST" ]]; then
-  # Déterminer le host de l'application de review
-  INPUT_HOST="$ESCAPED_BRANCH"
+  # Compute review-app host
+  if [[ -z "$INPUT_ROOT_DOMAIN" ]]; then
+    INPUT_HOST=$(echo "$ESCAPED_BRANCH")
 
-  if [[ -n "$INPUT_FQDN_PREFIX" ]]; then
-    INPUT_HOST="$INPUT_FQDN_PREFIX$INPUT_HOST"
+    if [[ -n "$INPUT_FQDN_PREFIX" ]]; then
+      INPUT_HOST=$(echo "$INPUT_FQDN_PREFIX$INPUT_HOST")
+    fi
+
+    # Limit to 64 chars max
+    INPUT_HOST="${INPUT_HOST:0:64}"
+
+    # Remove the trailing "-" character
+    if [[ $INPUT_HOST == *- ]]; then
+        INPUT_HOST="${INPUT_HOST%-}"
+    fi
+  else
+    INPUT_HOST=$(echo "$ESCAPED_BRANCH.$INPUT_ROOT_DOMAIN")
+
+    if [[ -n "$INPUT_FQDN_PREFIX" ]]; then
+      INPUT_HOST=$(echo "$INPUT_FQDN_PREFIX$INPUT_HOST")
+    fi
+
+    # Limit to 64 chars max
+    if [ ${#INPUT_HOST} -gt 64 ]; then
+      INPUT_HOST=$(echo "${ESCAPED_BRANCH:0:$((${#ESCAPED_BRANCH} - $((${#INPUT_HOST} - 64))))}.$INPUT_ROOT_DOMAIN")
+    fi
+
+    # Remove dash in middle of the host
+    if [[ $INPUT_HOST == *-.$INPUT_ROOT_DOMAIN ]]; then
+        INPUT_HOST=$(echo $INPUT_HOST | sed "s/-\.$INPUT_ROOT_DOMAIN/\.$INPUT_ROOT_DOMAIN/")
+    fi
   fi
-
-  if [[ -n "$INPUT_ROOT_DOMAIN" ]]; then
-    INPUT_HOST="$INPUT_HOST.$INPUT_ROOT_DOMAIN"
-  fi
-
-  # Limiter à 64 caractères max
-  if [[ ${#INPUT_HOST} -gt 64 ]]; then
-    INPUT_HOST="${ESCAPED_BRANCH:0:$((64 - ${#INPUT_ROOT_DOMAIN} - 1))}.$INPUT_ROOT_DOMAIN"
-  fi
-
-  # Supprimer un éventuel "-" avant le domaine
-  INPUT_HOST="${INPUT_HOST%-.$INPUT_ROOT_DOMAIN}.$INPUT_ROOT_DOMAIN"
 fi
 
 if [[ -z "$INPUT_FULL_DOMAIN" ]]; then
-  INPUT_FULL_DOMAIN="$ESCAPED_BRANCH"
-
-  if [[ -n "$INPUT_ROOT_DOMAIN" ]]; then
-    INPUT_FULL_DOMAIN="$INPUT_FULL_DOMAIN.$INPUT_ROOT_DOMAIN"
-  fi
-
-  # Limiter à 64 caractères max
-  if [[ ${#INPUT_FULL_DOMAIN} -gt 64 ]]; then
-    INPUT_FULL_DOMAIN="${ESCAPED_BRANCH:0:$((64 - ${#INPUT_ROOT_DOMAIN} - 1))}.$INPUT_ROOT_DOMAIN"
-  fi
-
-  # Supprimer un éventuel "-" avant le domaine
-  INPUT_FULL_DOMAIN="${INPUT_FULL_DOMAIN%-.$INPUT_ROOT_DOMAIN}.$INPUT_ROOT_DOMAIN"
+  INPUT_FULL_DOMAIN=$(echo "$INPUT_HOST" | sed "s/^$INPUT_FQDN_PREFIX//")
 fi
 
 if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
@@ -245,101 +247,97 @@ else
 fi
 
 if [[ $RA_FOUND == 'false' ]]; then
-    echo ""
-    echo "* Create review-app site"
+  echo ""
+  echo "* Create review-app site"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
 
-    if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
-      if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'"
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
-        }'
-      fi
+  if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
+    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "database": "'"$INPUT_DATABASE_NAME"'"
+      }'
     else
-      if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'"
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
-        }'
-      fi
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "database": "'"$INPUT_DATABASE_NAME"'",
+        "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
+      }'
     fi
-
-    if [[ -n "$INPUT_ALIASES" ]]; then
-      JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq --argjson aliases "$INPUT_ALIASES" '. + {aliases: $aliases}')
-    fi
-
-    if [[ $DEBUG == 'true' ]]; then
-      echo "[DEBUG] CURL POST on $API_URL with payload :"
-      echo $JSON_PAYLOAD
-      echo ""
-    fi
-
-    HTTP_STATUS=$(
-      curl -s -o response.json -w "%{http_code}" \
-        -X POST \
-        -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
-        -d "$JSON_PAYLOAD" \
-        "$API_URL"
-    )
-
-    JSON_RESPONSE=$(cat response.json)
-
-    if [[ $DEBUG == 'true' ]]; then
-      echo "[DEBUG] response JSON:"
-      echo $JSON_RESPONSE
-      echo ""
-    fi
-
-    if [[ $HTTP_STATUS -eq 200 ]]; then
-      echo $(jq '.site' response.json) > site.json
-      SITE_ID=$(jq -r '.id' site.json)
-
-      if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
-        echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
-      fi
-
-      if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
-        echo "New site (ID $SITE_ID) and database created successfully"
-      else
-        echo "New site (ID $SITE_ID) created successfully"
-      fi
+  else
+    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'"
+      }'
     else
-      echo "Failed to create new site. HTTP status code: $HTTP_STATUS"
-      echo "JSON Response:"
-      echo "$JSON_RESPONSE"
-      exit 1
+      JSON_PAYLOAD='{
+        "domain": "'"$INPUT_HOST"'",
+        "project_type": "'"$INPUT_PROJECT_TYPE"'",
+        "directory": "'"$INPUT_DIRECTORY"'",
+        "isolated": '"$INPUT_ISOLATED"',
+        "php_version": "'"$INPUT_PHP_VERSION"'",
+        "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
+      }'
     fi
   fi
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL POST on $API_URL with payload :"
+    echo $JSON_PAYLOAD
+    echo ""
+  fi
+
+  HTTP_STATUS=$(
+    curl -s -o response.json -w "%{http_code}" \
+      -X POST \
+      -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      -d "$JSON_PAYLOAD" \
+      "$API_URL"
+  )
+
+  JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
+
+  if [[ $HTTP_STATUS -eq 200 ]]; then
+    echo $(jq '.site' response.json) > site.json
+    SITE_ID=$(jq -r '.id' site.json)
+
+    if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+      echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
+    fi
+
+    if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
+      echo "New site (ID $SITE_ID) and database created successfully"
+    else
+      echo "New site (ID $SITE_ID) created successfully"
+    fi
+  else
+    echo "Failed to create new site. HTTP status code: $HTTP_STATUS"
+    echo "JSON Response:"
+    echo "$JSON_RESPONSE"
+    exit 1
+  fi
+fi
 
 if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
   echo ""
