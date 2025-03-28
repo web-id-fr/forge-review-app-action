@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import requests
 import json
 
 def get_env_var(name, default=None):
