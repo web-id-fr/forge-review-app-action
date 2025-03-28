@@ -44,6 +44,7 @@ if not INPUT_HOST:
             INPUT_HOST = f"{ESCAPED_BRANCH[:64 - len(INPUT_ROOT_DOMAIN) - 1]}.{INPUT_ROOT_DOMAIN}"
         INPUT_HOST = re.sub(r'-\.' + re.escape(INPUT_ROOT_DOMAIN), '.' + INPUT_ROOT_DOMAIN, INPUT_HOST)
 
+"""
 if get_env_var('GITHUB_ACTIONS') == 'true':
     with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
         f.write(f"host={INPUT_HOST}\n")
@@ -232,4 +233,4 @@ if response.status_code == 200:
 else:
     print(f"Failed to launch deployment. HTTP status code: {response.status_code}")
     print(f"JSON Response: {response.json()}")
-    exit(1)
+    exit(1) """
