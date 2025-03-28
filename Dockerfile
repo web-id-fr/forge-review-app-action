@@ -1,8 +1,15 @@
-FROM alpine:3.21
+# Utilisation de la dernière version de Python
+FROM python:latest
 
-RUN apk add --no-cache bash curl jq
+# Définition du répertoire de travail
+WORKDIR /app
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copie des fichiers nécessaires
+COPY requirements.txt .
+COPY script.py .
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Installation des dépendances
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Définition du point d'entrée de l'action
+ENTRYPOINT ["python", "script.py"]
