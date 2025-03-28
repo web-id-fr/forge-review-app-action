@@ -62,7 +62,7 @@ if get_env_var('GITHUB_ACTIONS') == 'true':
         f.write(f"database_name={INPUT_DATABASE_NAME}\n")
 
 
-""" ### PART 3 ###
+### PART 3 ###
 
 AUTH_HEADER = {"Authorization": f"Bearer {get_env_var('INPUT_FORGE_API_TOKEN')}"}
 API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites"
@@ -115,7 +115,7 @@ if not RA_FOUND:
 ### PART 4 ###
 
 # Check if repository is configured
-if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
+""" if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
     print("* Check if repository is configured")
     SITE_REPOSITORY = SITE_DATA.get('repository')
     if not SITE_REPOSITORY:
@@ -234,4 +234,4 @@ if response.status_code == 200:
 else:
     print(f"Failed to launch deployment. HTTP status code: {response.status_code}")
     print(f"JSON Response: {response.json()}")
-    exit(1)  """
+    exit(1) """
