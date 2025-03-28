@@ -16,7 +16,7 @@ DEBUG = get_env_var('DEBUG', 'false')
 if DEBUG == 'true':
     print("!!! DEBUG MODE ENABLED !!!")
 
-INPUT_BRANCH = get_env_var('INPUT_BRANCH', get_env_var('GITHUB_HEAD_REF'))
+INPUT_BRANCH = get_env_var('GITHUB_HEAD_REF')
 ESCAPED_BRANCH = re.sub(r'[^a-z0-9-]', '-', INPUT_BRANCH).strip('-')
 
 INPUT_PREFIX_WITH_PR_NUMBER = get_env_var('INPUT_PREFIX_WITH_PR_NUMBER', 'true')
@@ -61,7 +61,6 @@ INPUT_DATABASE_NAME = INPUT_DATABASE_NAME[:63]
 if get_env_var('GITHUB_ACTIONS') == 'true':
     with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
         f.write(f"database_name={INPUT_DATABASE_NAME}\n")
-
 
 ### PART 3 ###
 
@@ -118,7 +117,7 @@ if not RA_FOUND:
 # Check if repository is configured
 if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
     print("* Check if repository is configured")
-    SITE_REPOSITORY = SITE_DATA.get('repository')
+    SITE_REPOSITORY = SITE_DATA['repository']
     if not SITE_REPOSITORY:
         print("Repository not configured on Forge site")
         REPOSITORY_CONFIGURED = False
