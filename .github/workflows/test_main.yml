@@ -1,6 +1,6 @@
 name: Run Python Docker Action
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   run-action:
@@ -13,3 +13,5 @@ jobs:
         uses: ./
         with:
           root_domain: "web-id.fr"
+          forge_api_token: ''
+          forge_server_id: ''
