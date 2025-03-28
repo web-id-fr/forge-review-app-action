@@ -21,4 +21,5 @@ json_output = json.dumps(data, indent=4)
 print(f"🚀 {json_output}")
 
 with open(os.environ['GITHUB_OUTPUT'], 'a') as output_file:
-    print(f"result={json_output}", file=output_file)
+    print(f"message={message}", file=output_file)
+    print(f"api_status={api_status}", file=output_file)
