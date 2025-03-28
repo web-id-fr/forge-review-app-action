@@ -116,7 +116,7 @@ if not RA_FOUND:
 ### PART 4 ###
 
 # Check if repository is configured
-""" if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
+if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
     print("* Check if repository is configured")
     SITE_REPOSITORY = SITE_DATA.get('repository')
     if not SITE_REPOSITORY:
@@ -235,4 +235,4 @@ if response.status_code == 200:
 else:
     print(f"Failed to launch deployment. HTTP status code: {response.status_code}")
     print(f"JSON Response: {response.json()}")
-    exit(1) """
+    exit(1)
