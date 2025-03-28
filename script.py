@@ -17,14 +17,15 @@ if DEBUG == 'true':
     print("!!! DEBUG MODE ENABLED !!!")
 
 INPUT_BRANCH = get_env_var('GITHUB_HEAD_REF')
+INPUT_PREFIX_WITH_PR_NUMBER = get_env_var('INPUT_PREFIX_WITH_PR_NUMBER', 'true')
+
 ESCAPED_BRANCH = re.sub(r'[^a-z0-9-]', '-', INPUT_BRANCH).strip('-')
 
-INPUT_PREFIX_WITH_PR_NUMBER = get_env_var('INPUT_PREFIX_WITH_PR_NUMBER', 'true')
 if INPUT_PREFIX_WITH_PR_NUMBER == 'true':
     match = re.search(r'\d+', get_env_var('GITHUB_REF_NAME'))
     if match:
         PR_NUMBER = match.group(0)
-        ESCAPED_BRANCH = f"{PR_NUMBER}-{ESCAPED_BRANCH}"
+        ESCAPED_BRANCH = f"{ESCAPED_BRANCH}"
 
 # More variables initialization
 INPUT_HOST = get_env_var('INPUT_HOST')
