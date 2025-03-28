@@ -294,6 +294,22 @@ if [[ $RA_FOUND == 'false' ]]; then
     fi
   fi
 
+  if [[ -n "$INPUT_ALIASES" ]]; then
+    if ! echo "$INPUT_ALIASES" | jq empty; then
+      echo "Invalid JSON format for aliases: $INPUT_ALIASES"
+      exit 1
+    fi
+
+    if ! echo "$INPUT_ALIASES" | jq -e 'if type == "array" then . else empty end' > /dev/null; then
+      echo "Aliases should be a JSON array: $INPUT_ALIASES"
+      exit 1
+    fi
+
+    if [[ -n "$INPUT_ALIASES" ]]; then
+      JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq --argjson aliases "$INPUT_ALIASES" '. + {aliases: $aliases}')
+    fi
+  fi
+
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL POST on $API_URL with payload :"
     echo $JSON_PAYLOAD
