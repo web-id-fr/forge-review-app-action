@@ -209,9 +209,11 @@ debug_log(f"Generated .env file content:\n{env_content}")
 # Properly escape the JSON content
 escaped_env_content = json.dumps(env_content)
 
-API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/env"
+# Prepare the payload
 JSON_PAYLOAD = {"content": escaped_env_content}
 debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD, indent=4)}")
+
+# Send the request
 response = requests.put(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
 if response.status_code == 200:
     print(".env file updated successfully")
