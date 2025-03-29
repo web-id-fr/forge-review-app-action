@@ -52,7 +52,7 @@ if get_env_var('GITHUB_ACTIONS') == 'true':
     with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
         f.write(f"host={INPUT_HOST}\n")
 
-INPUT_REPOSITORY = get_env_var('INPUT_REPOSITORY', get_env_var('GITHUB_REPOSITORY'))
+INPUT_REPOSITORY = get_env_var('GITHUB_REPOSITORY')
 INPUT_DATABASE_NAME = get_env_var('INPUT_DATABASE_NAME', re.sub(r'[^a-z0-9_]', '_', ESCAPED_BRANCH).strip('_'))
 INPUT_DATABASE_NAME_PREFIX = get_env_var('INPUT_DATABASE_NAME_PREFIX')
 if INPUT_DATABASE_NAME_PREFIX:
