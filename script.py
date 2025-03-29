@@ -202,13 +202,13 @@ if get_env_var('INPUT_LETSENCRYPT_CERTIFICATE', 'true') == 'true':
 # Setup .env file
 print("* Setup .env file")
 env_stub_path = f"/github/workspace/{get_env_var('INPUT_ENV_STUB_PATH', '.github/workflows/.env.stub')}"
+env_content = env_to_json('.github/workflows/.env.stub')
 
-debug_log(f"Generated .env file content:\n{env_to_json(env_stub_path)}")
+debug_log(f"Generated .env file content:\n{env_content}")
 
-escaped_env_content = env_to_json(env_stub_path)
 API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/env"
-JSON_PAYLOAD = {"content": escaped_env_content}
-debug_log(f"CURL POST on {API_URL} with payload: {JSON_PAYLOAD}")
+JSON_PAYLOAD = json.dumps({"content": env_content}, indent=4)
+debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD)}")
 response = requests.put(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
 if response.status_code == 200:
     print(".env file updated successfully")
