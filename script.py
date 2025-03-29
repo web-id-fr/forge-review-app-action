@@ -236,7 +236,7 @@ JSON_PAYLOAD = {
     "auto_source": get_env_var('INPUT_DEPLOYMENT_AUTO_SOURCE', 'true') == 'true'
 }
 debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD)}")
-response = requests.put(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
+response = requests.post(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
 if response.status_code == 200:
     print("Deployment script updated successfully")
 else:
