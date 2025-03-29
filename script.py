@@ -11,6 +11,25 @@ def debug_log(message):
     """ if get_env_var('DEBUG', 'false') == 'true': """
     print(f"[DEBUG] {message}")
 
+def env_to_json(env_path):
+    env_dict = {}
+
+    with open(env_path, 'r') as file:
+        env_content = file.read()
+
+    env_content = env_content.replace('STUB_HOST', INPUT_HOST)
+    env_content = env_content.replace('STUB_DATABASE_NAME', INPUT_DATABASE_NAME)
+    env_content = env_content.replace('STUB_DATABASE_USER', get_env_var('INPUT_DATABASE_USER', 'forge'))
+    env_content = env_content.replace('STUB_DATABASE_PASSWORD', get_env_var('INPUT_DATABASE_PASSWORD'))
+
+    for line in env_content.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):  # Ignore empty lines and comments
+            key, value = line.split("=", 1)
+            env_dict[key.strip()] = value.strip()
+
+    return json.dumps(env_dict, indent=4)
+
 # Prepare vars and default values
 DEBUG = get_env_var('DEBUG', 'false')
 if DEBUG == 'true':
@@ -183,20 +202,13 @@ if get_env_var('INPUT_LETSENCRYPT_CERTIFICATE', 'true') == 'true':
 # Setup .env file
 print("* Setup .env file")
 env_stub_path = f"/github/workspace/{get_env_var('INPUT_ENV_STUB_PATH', '.github/workflows/.env.stub')}"
-with open(env_stub_path, 'r') as file:
-    env_content = file.read()
-
-env_content = env_content.replace('STUB_HOST', INPUT_HOST)
-env_content = env_content.replace('STUB_DATABASE_NAME', INPUT_DATABASE_NAME)
-env_content = env_content.replace('STUB_DATABASE_USER', get_env_var('INPUT_DATABASE_USER', 'forge'))
-env_content = env_content.replace('STUB_DATABASE_PASSWORD', get_env_var('INPUT_DATABASE_PASSWORD'))
 
 debug_log(f"Generated .env file content:\n{env_content}")
 
-escaped_env_content = json.dumps(env_content)
+escaped_env_content = env_to_json(env_stub_path)
 API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/env"
 JSON_PAYLOAD = {"content": escaped_env_content}
-debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD)}")
+debug_log(f"CURL POST on {API_URL} with payload: {JSON_PAYLOAD}")
 response = requests.put(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
 if response.status_code == 200:
     print(".env file updated successfully")
