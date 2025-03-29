@@ -129,6 +129,7 @@ if get_env_var('INPUT_CONFIGURE_REPOSITORY', 'true') == 'true':
     if not REPOSITORY_CONFIGURED:
         print("* Setup git repository on site")
         API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/git"
+        print(f"PROVIDER : {get_env_var('INPUT_REPOSITORY_PROVIDER', 'github')}, REPOSITORY : {INPUT_REPOSITORY}, BRANCH : {INPUT_BRANCH}, COMPOSER : {get_env_var('INPUT_COMPOSER', 'false')}")
         JSON_PAYLOAD = {
             "provider": get_env_var('INPUT_REPOSITORY_PROVIDER', 'github'),
             "repository": INPUT_REPOSITORY,
