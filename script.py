@@ -203,7 +203,7 @@ if get_env_var('INPUT_LETSENCRYPT_CERTIFICATE', 'true') == 'true':
 print("* Setup .env file")
 env_stub_path = f"/github/workspace/{get_env_var('INPUT_ENV_STUB_PATH', '.github/workflows/.env.stub')}"
 
-debug_log(f"Generated .env file content:\n{env_content}")
+debug_log(f"Generated .env file content:\n{env_to_json(env_stub_path)}")
 
 escaped_env_content = env_to_json(env_stub_path)
 API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/env"
