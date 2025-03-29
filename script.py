@@ -207,8 +207,8 @@ env_content = env_to_json('.github/workflows/.env.stub')
 debug_log(f"Generated .env file content:\n{env_content}")
 
 API_URL = f"https://forge.laravel.com/api/v1/servers/{get_env_var('INPUT_FORGE_SERVER_ID')}/sites/{SITE_ID}/env"
-JSON_PAYLOAD = json.dumps({"content": env_content}, indent=4)
-debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD)}")
+JSON_PAYLOAD = {"content": env_content}
+debug_log(f"CURL POST on {API_URL} with payload: {json.dumps(JSON_PAYLOAD, indent=4)}")
 response = requests.put(API_URL, headers=AUTH_HEADER, json=JSON_PAYLOAD)
 if response.status_code == 200:
     print(".env file updated successfully")
