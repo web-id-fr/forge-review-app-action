@@ -8,8 +8,8 @@ def get_env_var(name, default=None):
     return os.getenv(name, default)
 
 def debug_log(message):
-    if get_env_var('DEBUG', 'false') == 'true':
-        print(f"[DEBUG] {message}")
+    """ if get_env_var('DEBUG', 'false') == 'true': """
+    print(f"[DEBUG] {message}")
 
 # Prepare vars and default values
 DEBUG = get_env_var('DEBUG', 'false')
