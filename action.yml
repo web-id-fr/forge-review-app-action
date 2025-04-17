@@ -1,9 +1,11 @@
 name: 'Forge Review-app Action'
 description: 'Create/update and deploy a review-application to Laravel Forge'
 author: 'rygilles'
+
 branding:
   icon: upload-cloud
   color: green
+
 inputs:
   forge_api_token:
     description: 'Laravel Forge API key'
@@ -148,6 +150,9 @@ outputs:
     description: 'Host of the review-app (generated or forced one in inputs)'
   database_name:
     description: 'Database name of the review-app (generated or forced one in inputs)'
+
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
+  using: 'composite'
+  steps:
+    - name: "Forge Review-app Action"
+      uses: "docker://ghcr.io/web-id-fr/forge-review-app-action:v1.3.2"
