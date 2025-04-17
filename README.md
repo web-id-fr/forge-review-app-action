@@ -122,11 +122,12 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 
 ## Outputs
 
-| Output          | Description                                                          |
-|-----------------|----------------------------------------------------------------------|
-| `host`          | Host of the review-app (generated or forced one in inputs).          |
-| `database_name` | Database name of the review-app (generated or forced one in inputs). |
-| `site_id`       | Forge site ID of the review-app.                                     |
+| Output          | Description                                                           |
+|-----------------|-----------------------------------------------------------------------|
+| `host`          | Host of the review-app (generated or forced one in inputs).           |
+| `database_name` | Database name of the review-app (generated or forced one in inputs).  |
+| `site_id`       | Forge site ID of the review-app.                                      |
+| `worker_id`     | Worker ID.                                                            |
 
 You can easily use those outputs variables to generate a message on your pull-request with this action next:
 
