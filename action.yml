@@ -148,13 +148,22 @@ inputs:
 outputs:
   host:
     description: 'Host of the review-app (generated or forced one in inputs)'
+    value: ${{ steps.forge-review-app-action.outputs.host }}
   database_name:
     description: 'Database name of the review-app (generated or forced one in inputs)'
+    value: ${{ steps.forge-review-app-action.outputs.database_name }}
+  site_id:
+    description: 'Forge site ID of the review-app'
+    value: ${{ steps.forge-review-app-action.outputs.site_id }}
+  worker_id:
+    description: 'Worker ID'
+    value: ${{ steps.forge-review-app-action.outputs.worker_id }}
 
 runs:
   using: 'composite'
   steps:
     - name: "Forge Review-app Action"
+      id: forge-review-app-action
       uses: "docker://ghcr.io/web-id-fr/forge-review-app-action:v1.3.2"
       env:
         INPUT_FORGE_API_TOKEN: ${{ inputs.forge_api_token }}
