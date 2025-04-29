@@ -1,8 +1,9 @@
-FROM alpine:3.21
+FROM python:latest
+WORKDIR /app
 
-RUN apk add --no-cache bash curl jq
+COPY requirements.txt /requirements.txt
+COPY script.py /script.py
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN pip install --no-cache-dir -r /requirements.txt
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["python", "/script.py"]

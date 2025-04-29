@@ -1,0 +1,17 @@
+name: Run Python Docker Action
+
+on: [push]
+
+jobs:
+  run-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Exécuter l'action Docker
+        uses: ./
+        with:
+          root_domain: "web-id.fr"
+          forge_api_token: ''
+          forge_server_id: ''
