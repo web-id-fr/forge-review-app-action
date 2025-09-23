@@ -120,6 +120,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `worker_queue`              | no       |                                        | Worker queue (if creation is requested). Default queue will be used if not defined.                                                         |
 | `horizon_enabled`           | no       | `false`                                | Enable Laravel Horizon integration.                                                                                                         |
 | `scheduler_enabled`         | no       | `false`                                | Enable Laravel Scheduler integration.                                                                                                       |
+| `quick_deploy_enabled`      | no       | `false`                                | Enable quick deployment trigger.                                                                                                            |
 
 
 ## Outputs
