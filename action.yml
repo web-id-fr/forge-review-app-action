@@ -144,6 +144,10 @@ inputs:
   worker_queue:
     description: 'Worker queue (if creation is requested). Default queue will be used if not defined.'
     required: false
+  horizon_enabled:
+    description: 'Enable Laravel Horizon integration'
+    required: false
+    default: 'false'
 
 outputs:
   host:
