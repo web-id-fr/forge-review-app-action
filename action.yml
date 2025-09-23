@@ -148,6 +148,10 @@ inputs:
     description: 'Enable Laravel Horizon integration'
     required: false
     default: 'false'
+  scheduler_enabled:
+    description: 'Enable Laravel Scheduler integration'
+    required: false
+    default: 'false'
 
 outputs:
   host:
@@ -208,3 +212,5 @@ runs:
         INPUT_WORKER_DAEMON: ${{ inputs.worker_daemon }}
         INPUT_WORKER_FORCE: ${{ inputs.worker_force }}
         INPUT_WORKER_QUEUE: ${{ inputs.worker_queue }}
+        INPUT_HORIZON_ENABLED: ${{ inputs.horizon_enabled }}
+        INPUT_SCHEDULER_ENABLED: ${{ inputs.scheduler_enabled }}
