@@ -70,6 +70,70 @@ if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
   echo "host=$INPUT_HOST" >> $GITHUB_OUTPUT
 fi
 
+# Process aliases if provided
+ALL_DOMAINS="$INPUT_HOST"
+if [[ -n "$INPUT_ALIASES" ]]; then
+  echo ""
+  echo "* Processing aliases: $INPUT_ALIASES"
+  
+  # Convert comma-separated aliases to array and trim whitespace
+  IFS=',' read -ra ALIASES <<< "$INPUT_ALIASES"
+  ALIAS_DOMAINS=""
+  
+  for alias in "${ALIASES[@]}"; do
+    # Trim whitespace from alias
+    alias=$(echo "$alias" | xargs)
+
+    if [[ -n "$alias" ]]; then
+      # Basic validation: only allow alphanumeric characters and hyphens
+      if [[ ! "$alias" =~ ^[a-zA-Z0-9-]+$ ]]; then
+        echo "Error: Invalid alias '$alias'. Only alphanumeric characters and hyphens are allowed."
+        if [[ $DEBUG == 'true' ]]; then
+          echo "[DEBUG] Failed validation regex: ^[a-zA-Z0-9-]+$"
+        fi
+        exit 1
+      fi
+
+      # Validate alias doesn't start or end with hyphen
+      if [[ "$alias" =~ ^- ]] || [[ "$alias" =~ -$ ]]; then
+        echo "Error: Invalid alias '$alias'. Cannot start or end with hyphen."
+        if [[ $DEBUG == 'true' ]]; then
+          echo "[DEBUG] Failed hyphen validation for alias: '$alias'"
+        fi
+        exit 1
+      fi
+
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] Alias '$alias' passed validation"
+      fi
+
+      # Create alias domain by prepending alias to the main host
+      if [[ "$INPUT_HOST" == *.* ]]; then
+        # If host contains dots, insert alias at the beginning
+        ALIAS_DOMAIN="$alias.$INPUT_HOST"
+      else
+        # If host is just a hostname, append alias with a dot
+        ALIAS_DOMAIN="$alias-$INPUT_HOST"
+      fi
+
+      if [[ -n "$ALIAS_DOMAINS" ]]; then
+        ALIAS_DOMAINS="$ALIAS_DOMAINS,$ALIAS_DOMAIN"
+      else
+        ALIAS_DOMAINS="$ALIAS_DOMAIN"
+      fi
+
+      echo "  - Created alias: $ALIAS_DOMAIN"
+    fi
+  done
+  
+  # Combine main host with alias domains for certificate
+  if [[ -n "$ALIAS_DOMAINS" ]]; then
+    ALL_DOMAINS="$INPUT_HOST,$ALIAS_DOMAINS"
+  fi
+  
+  echo "All domains for certificate: $ALL_DOMAINS"
+fi
+
 if [[ -z "$INPUT_REPOSITORY" ]]; then
   INPUT_REPOSITORY=$GITHUB_REPOSITORY
 fi
@@ -444,8 +508,23 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/letsencrypt"
 
+    # Convert comma-separated domains to JSON array
+    DOMAINS_JSON_ARRAY=""
+    IFS=',' read -ra DOMAIN_ARRAY <<< "$ALL_DOMAINS"
+    for domain in "${DOMAIN_ARRAY[@]}"; do
+      # Trim whitespace
+      domain=$(echo "$domain" | xargs)
+      if [[ -n "$domain" ]]; then
+        if [[ -n "$DOMAINS_JSON_ARRAY" ]]; then
+          DOMAINS_JSON_ARRAY="$DOMAINS_JSON_ARRAY, \"$domain\""
+        else
+          DOMAINS_JSON_ARRAY="\"$domain\""
+        fi
+      fi
+    done
+
     JSON_PAYLOAD='{
-      "domains": ["'"$INPUT_HOST"'"]
+      "domains": ['"$DOMAINS_JSON_ARRAY"']
     }'
 
     if [[ $DEBUG == 'true' ]]; then
