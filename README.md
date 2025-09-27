@@ -44,7 +44,7 @@ When you provide aliases using the `aliases` input parameter (comma-separated), 
 - If your main host is `123-feature.example.com` and aliases are `clientes, www`, you'll get:
   - Main domain: `123-feature.example.com`
   - Alias domains: `clientes.123-feature.example.com`, `www.123-feature.example.com`
-  
+
 - If your main host is `123-feature` (no root domain) and aliases are `api, admin`, you'll get:
   - Main domain: `123-feature`
   - Alias domains: `api-123-feature`, `admin-123-feature`
@@ -209,6 +209,15 @@ jobs:
           aliases: 'www, api, admin'
           create_database: 'true'
           database_password: ${{ secrets.FORGE_DB_PASSWORD }}
+```
+
+## Testing
+
+We have a few tests with BATS.
+
+```bash
+npm install
+npm test
 ```
 
 ## Credits
