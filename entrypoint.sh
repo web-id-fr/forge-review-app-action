@@ -188,6 +188,18 @@ if [[ -z "$INPUT_WORKER_FORCE" ]]; then
   INPUT_WORKER_FORCE='false'
 fi
 
+if [[ -z "$INPUT_HORIZON_ENABLED" ]]; then
+  INPUT_HORIZON_ENABLED='false'
+fi
+
+if [[ -z "$INPUT_SCHEDULER_ENABLED" ]]; then
+  INPUT_SCHEDULER_ENABLED='false'
+fi
+
+if [[ -z "$INPUT_QUICK_DEPLOY_ENABLED" ]]; then
+  INPUT_QUICK_DEPLOY_ENABLED='false'
+fi
+
 echo ""
 echo "* Check that stubs files exists"
 
@@ -854,6 +866,120 @@ else
   echo ""
   echo "$LAST_DEPLOYMENT_OUTPUT"
   exit 1
+fi
+
+if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
+  echo ""
+  echo "* Enable Laravel Horizon integration"
+
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/integrations/horizon"
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL POST on $API_URL"
+    echo ""
+  fi
+
+  HTTP_STATUS=$(
+    curl -s -o response.json -w "%{http_code}" \
+      -X POST \
+      -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      "$API_URL"
+  )
+
+  JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
+
+  if [[ $HTTP_STATUS -eq 200 ]]; then
+    echo "Laravel Horizon integration enabled successfully"
+  else
+    echo "Failed to enable Laravel Horizon integration. HTTP status code: $HTTP_STATUS"
+    echo "JSON Response:"
+    echo "$JSON_RESPONSE"
+    exit 1
+  fi
+fi
+
+if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
+  echo ""
+  echo "* Enable Laravel Scheduler integration"
+
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/integrations/laravel-scheduler"
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL POST on $API_URL"
+    echo ""
+  fi
+
+  HTTP_STATUS=$(
+    curl -s -o response.json -w "%{http_code}" \
+      -X POST \
+      -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      "$API_URL"
+  )
+
+  JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
+
+  if [[ $HTTP_STATUS -eq 200 ]]; then
+    echo "Laravel Scheduler integration enabled successfully"
+  else
+    echo "Failed to enable Laravel Scheduler integration. HTTP status code: $HTTP_STATUS"
+    echo "JSON Response:"
+    echo "$JSON_RESPONSE"
+    exit 1
+  fi
+fi
+
+if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
+  echo ""
+  echo "* Trigger quick deployment"
+
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment"
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL POST on $API_URL"
+    echo ""
+  fi
+
+  HTTP_STATUS=$(
+    curl -s -o response.json -w "%{http_code}" \
+      -X POST \
+      -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      -H "Content-Type: application/json" \
+      "$API_URL"
+  )
+
+  JSON_RESPONSE=$(cat response.json)
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo $JSON_RESPONSE
+    echo ""
+  fi
+
+  if [[ $HTTP_STATUS -eq 200 ]]; then
+    echo "Quick deployment triggered successfully"
+  else
+    echo "Failed to trigger quick deployment. HTTP status code: $HTTP_STATUS"
+    echo "JSON Response:"
+    echo "$JSON_RESPONSE"
+    exit 1
+  fi
 fi
 
 if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
