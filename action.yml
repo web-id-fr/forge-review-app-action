@@ -144,6 +144,18 @@ inputs:
   worker_queue:
     description: 'Worker queue (if creation is requested). Default queue will be used if not defined.'
     required: false
+  horizon_enabled:
+    description: 'Enable Laravel Horizon integration'
+    required: false
+    default: 'false'
+  scheduler_enabled:
+    description: 'Enable Laravel Scheduler integration'
+    required: false
+    default: 'false'
+  quick_deploy_enabled:
+    description: 'Enable quick deployment trigger'
+    required: false
+    default: 'false'
   aliases:
     description: 'Comma-separated list of aliases to create based on the main host (e.g., "clientes, www")'
     required: false
@@ -207,4 +219,7 @@ runs:
         INPUT_WORKER_DAEMON: ${{ inputs.worker_daemon }}
         INPUT_WORKER_FORCE: ${{ inputs.worker_force }}
         INPUT_WORKER_QUEUE: ${{ inputs.worker_queue }}
+        INPUT_HORIZON_ENABLED: ${{ inputs.horizon_enabled }}
+        INPUT_SCHEDULER_ENABLED: ${{ inputs.scheduler_enabled }}
+        INPUT_QUICK_DEPLOY_ENABLED: ${{ inputs.quick_deploy_enabled }}
         INPUT_ALIASES: ${{ inputs.aliases }}
