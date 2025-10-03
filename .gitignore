@@ -1,12 +1,1 @@
 .idea
-
-# Node.js dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.log
-
-# Test artifacts
-test/tmp/
-*.tmp
