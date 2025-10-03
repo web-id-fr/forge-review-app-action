@@ -156,9 +156,6 @@ inputs:
     description: 'Enable quick deployment trigger'
     required: false
     default: 'false'
-  aliases:
-    description: 'Comma-separated list of aliases to create based on the main host (e.g., "clientes, www")'
-    required: false
 
 outputs:
   host:
@@ -222,4 +219,3 @@ runs:
         INPUT_HORIZON_ENABLED: ${{ inputs.horizon_enabled }}
         INPUT_SCHEDULER_ENABLED: ${{ inputs.scheduler_enabled }}
         INPUT_QUICK_DEPLOY_ENABLED: ${{ inputs.quick_deploy_enabled }}
-        INPUT_ALIASES: ${{ inputs.aliases }}
