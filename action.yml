@@ -174,23 +174,9 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: "Extract Docker image version"
-      id: extract-version
-      shell: bash
-      run: |
-        # Extract version from github.action_ref
-        # Example: "web-id-fr/forge-review-app-action@v1.3.2" -> "v1.3.2"
-        if [[ "${{ github.action_ref }}" == *"@"* ]]; then
-          VERSION="${{{ github.action_ref }}#*@}"
-        else
-          VERSION="latest"
-        fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Using Docker image version: $VERSION"
-
     - name: "Forge Review-app Action"
       id: forge-review-app-action
-      uses: "docker://ghcr.io/web-id-fr/forge-review-app-action:${{ steps.extract-version.outputs.version }}"
+      uses: "docker://ghcr.io/web-id-fr/forge-review-app-action:v1"
       env:
         INPUT_FORGE_API_TOKEN: ${{ inputs.forge_api_token }}
         INPUT_FORGE_SERVER_ID: ${{ inputs.forge_server_id }}
