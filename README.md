@@ -31,6 +31,26 @@ For example, a `fix-37` branch with `mydomain.tld` root_domain will result in a 
 
 `database_name` is also based on the branch name (escaping it with only `a-z0-9_` chars).
 
+### Aliases Support
+
+The action supports creating domain aliases that are based on the main host. This is useful when you need multiple domains pointing to the same review app.
+
+When you provide aliases using the `aliases` input parameter (comma-separated), the action will:
+
+1. Create alias domains based on the main host
+2. Include all aliases in the Let's Encrypt certificate request
+
+**Examples:**
+- If your main host is `123-feature.example.com` and aliases are `clientes, www`, you'll get:
+  - Main domain: `123-feature.example.com`
+  - Alias domains: `clientes.123-feature.example.com`, `www.123-feature.example.com`
+
+- If your main host is `123-feature` (no root domain) and aliases are `api, admin`, you'll get:
+  - Main domain: `123-feature`
+  - Alias domains: `api-123-feature`, `admin-123-feature`
+
+All domains will be included in the SSL certificate for HTTPS access.
+
 ### About stub files
 <a name="stub-files"></a>
 
@@ -121,6 +141,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `horizon_enabled`           | no       | `false`                                | Enable Laravel Horizon integration.                                                                                                         |
 | `scheduler_enabled`         | no       | `false`                                | Enable Laravel Scheduler integration.                                                                                                       |
 | `quick_deploy_enabled`      | no       | `false`                                | Enable quick deployment trigger.                                                                                                            |
+| `aliases`                   | no       |                                        | Comma-separated list of aliases to create based on the main host (e.g., "clientes, www"). These will be added to the SSL certificate.       |
 
 
 ## Outputs
@@ -166,6 +187,40 @@ jobs:
           forge_server_id: ${{ secrets.FORGE_SERVER_ID }}
           create_database: 'true'
           database_password: ${{ secrets.FORGE_DB_PASSWORD }}
+```
+
+Create a review-app with domain aliases:
+
+```yml
+name: review-app
+on:
+  pull_request:
+    types: [ 'opened', 'reopened', 'synchronize', 'ready_for_review' ]
+
+jobs:
+  review-app:
+    runs-on: ubuntu-latest
+    name: "Create or update Forge review-app with aliases"
+
+    steps:
+      - name: Deploy
+        uses: web-id-fr/forge-review-app-action@v1.0.0
+        with:
+          forge_api_token: ${{ secrets.FORGE_API_TOKEN }}
+          forge_server_id: ${{ secrets.FORGE_SERVER_ID }}
+          root_domain: 'example.com'
+          aliases: 'www, api, admin'
+          create_database: 'true'
+          database_password: ${{ secrets.FORGE_DB_PASSWORD }}
+```
+
+## Testing
+
+We have a few tests with BATS.
+
+```bash
+npm install
+npm test
 ```
 
 ## Credits
