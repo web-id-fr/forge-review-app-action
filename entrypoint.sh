@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # Prepare vars and default values
@@ -9,6 +9,13 @@ fi
 
 if [[ $DEBUG == 'true' ]]; then
   echo "!!! DEBUG MODE ENABLED !!!"
+fi
+
+# Use GITHUB_WORKSPACE if set, otherwise default to /github/workspace
+if [[ -n "$GITHUB_WORKSPACE" ]]; then
+    WORKSPACE="$GITHUB_WORKSPACE"
+else
+    WORKSPACE="/github/workspace"
 fi
 
 if [[ -z "$INPUT_BRANCH" ]]; then
@@ -61,7 +68,7 @@ if [[ -z "$INPUT_HOST" ]]; then
 
     # Remove dash in middle of the host
     if [[ $INPUT_HOST == *-.$INPUT_ROOT_DOMAIN ]]; then
-        INPUT_HOST=$(echo $INPUT_HOST | sed "s/-\.$INPUT_ROOT_DOMAIN/\.$INPUT_ROOT_DOMAIN/")
+        INPUT_HOST=$(echo "$INPUT_HOST" | sed "s/-\.$INPUT_ROOT_DOMAIN/\.$INPUT_ROOT_DOMAIN/")
     fi
   fi
 fi
@@ -203,13 +210,13 @@ fi
 echo ""
 echo "* Check that stubs files exists"
 
-if [ ! -e "/github/workspace/$INPUT_ENV_STUB_PATH" ]; then
-  echo ".env stub file not found at /github/workspace/$INPUT_ENV_STUB_PATH"
+if [ ! -e "$WORKSPACE/$INPUT_ENV_STUB_PATH" ]; then
+  echo ".env stub file not found at $WORKSPACE/$INPUT_ENV_STUB_PATH"
   exit 1
 fi
 
-if [ ! -e "/github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH" ]; then
-  echo "Deploy script stub file not found at /github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH"
+if [ ! -e "$WORKSPACE/$INPUT_DEPLOY_SCRIPT_STUB_PATH" ]; then
+  echo "Deploy script stub file not found at $WORKSPACE/$INPUT_DEPLOY_SCRIPT_STUB_PATH"
   exit 1
 fi
 
@@ -229,17 +236,18 @@ JSON_RESPONSE=$(
     -H "Accept: application/json" \
     "$API_URL"
 )
+
 echo "$JSON_RESPONSE" > sites.json
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  echo $JSON_RESPONSE
+  echo "$JSON_RESPONSE"
   echo ""
 fi
 
 # Check if review-app site exists
 SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$INPUT_HOST"'") // empty' sites.json)
-if [[ ! -z "$SITE_DATA" ]]; then
+if [[ -n "$SITE_DATA" ]]; then
   echo "$SITE_DATA" > site.json
   SITE_ID=$(jq -r '.id' site.json)
 
@@ -304,12 +312,12 @@ if [[ $RA_FOUND == 'false' ]]; then
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL POST on $API_URL with payload :"
-    echo $JSON_PAYLOAD
+    echo "$JSON_PAYLOAD"
     echo ""
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o site-create-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
       -H "Accept: application/json" \
@@ -318,16 +326,16 @@ if [[ $RA_FOUND == 'false' ]]; then
       "$API_URL"
   )
 
-  JSON_RESPONSE=$(cat response.json)
+  JSON_RESPONSE=$(cat site-create-response.json)
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
   if [[ $HTTP_STATUS -eq 200 ]]; then
-    echo $(jq '.site' response.json) > site.json
+    jq '.site' site-create-response.json > site.json
     SITE_ID=$(jq -r '.id' site.json)
 
     if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
@@ -375,12 +383,12 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
 
     if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] CURL POST on $API_URL with payload :"
-        echo $JSON_PAYLOAD
+        echo "$JSON_PAYLOAD"
         echo ""
       fi
 
     HTTP_STATUS=$(
-      curl -s -o response.json -w "%{http_code}" \
+      curl -s -o setup-git-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
         -H "Accept: application/json" \
@@ -389,11 +397,11 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
         "$API_URL"
     )
 
-    JSON_RESPONSE=$(cat response.json)
+    JSON_RESPONSE=$(cat setup-git-response.json)
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] response JSON:"
-      echo $JSON_RESPONSE
+      echo "$JSON_RESPONSE"
       echo ""
     fi
 
@@ -420,7 +428,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o site-certificates-response.json -w "%{http_code}" \
     -X GET \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -430,13 +438,13 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    cat response.json
+    cat site-certificates-response.json
     echo ""
   fi
 
   if [[ $HTTP_STATUS -eq 200 ]]; then
     echo "Fetched site certificates successfully"
-    if jq -e '.certificates | length > 0' response.json > /dev/null; then
+    if jq -e '.certificates | length > 0' site-certificates-response.json > /dev/null; then
       echo "Site has at least one certificate"
       CERTIFICATE_FOUND='true'
     else
@@ -446,7 +454,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
   else
     echo "Failed to fetch site certificates. HTTP status code: $HTTP_STATUS"
     echo "JSON Response:"
-    cat response.json
+    cat site-certificates-response.json
     exit 1
   fi
 
@@ -462,12 +470,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] CURL POST on $API_URL with payload :"
-      echo $JSON_PAYLOAD
+      echo "$JSON_PAYLOAD"
       echo ""
     fi
 
     HTTP_STATUS=$(
-      curl -s -o response.json -w "%{http_code}" \
+      curl -s -o site-letsencrypt-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
         -H "Accept: application/json" \
@@ -476,17 +484,17 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
         "$API_URL"
     )
 
-    JSON_RESPONSE=$(cat response.json)
+    JSON_RESPONSE=$(cat site-letsencrypt-response.json)
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] response JSON:"
-      echo $JSON_RESPONSE
+      echo "$JSON_RESPONSE"
       echo ""
     fi
 
     if [[ $HTTP_STATUS -eq 200 ]]; then
       echo "Request for a let's encrypt certificate sent successfully"
-      echo "$(jq -r '.certificate' response.json)" > certificate.json
+      jq -r '.certificate' site-letsencrypt-response.json > certificate.json
     else
       echo "Failed to request let's encrypt certificate. HTTP status code: $HTTP_STATUS"
       echo "JSON Response:"
@@ -513,7 +521,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       fi
 
       HTTP_STATUS=$(
-        curl -s -o response.json -w "%{http_code}" \
+        curl -s -o sites-certificates-response.json -w "%{http_code}" \
         -X GET \
         -H "$AUTH_HEADER" \
         -H "Accept: application/json" \
@@ -521,11 +529,11 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
         "$API_URL"
       )
 
-      JSON_RESPONSE=$(cat response.json)
+      JSON_RESPONSE=$(cat sites-certificates-response.json)
 
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] response JSON:"
-        echo $JSON_RESPONSE
+        echo "$JSON_RESPONSE"
         echo ""
       fi
 
@@ -539,7 +547,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       status=$(echo "$JSON_RESPONSE" | jq -r '.certificate."status"')
 
       if [[ "$status" != "installed" ]]; then
-        echo "Status is not "installed" ($status), retrying in 5 seconds..."
+        echo "Status is not \"installed\" ($status), retrying in 5 seconds..."
         sleep 5
       fi
 
@@ -559,7 +567,7 @@ fi
 echo ""
 echo "* Setup .env file"
 
-cp /github/workspace/$INPUT_ENV_STUB_PATH .env
+cp "$WORKSPACE/$INPUT_ENV_STUB_PATH" .env
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] Stub .env file content:"
@@ -576,7 +584,7 @@ ENV_CONTENT=$(cat .env)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] Generated .env file content:"
-  echo $ENV_CONTENT
+  echo "$ENV_CONTENT"
   echo ""
 fi
 
@@ -584,7 +592,7 @@ ESCAPED_ENV_CONTENT=$(echo "$ENV_CONTENT" | jq -Rsa .)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] Escaped .env file content:"
-  echo $ESCAPED_ENV_CONTENT
+  echo "$ESCAPED_ENV_CONTENT"
   echo ""
 fi
 
@@ -596,12 +604,12 @@ JSON_PAYLOAD='{
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] CURL POST on $API_URL with payload :"
-  echo $JSON_PAYLOAD
+  echo "$JSON_PAYLOAD"
   echo ""
 fi
 
 HTTP_STATUS=$(
-  curl -s -o response.json -w "%{http_code}" \
+  curl -s -o update-site-env-response.json -w "%{http_code}" \
     -X PUT \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -610,11 +618,11 @@ HTTP_STATUS=$(
     "$API_URL"
 )
 
-JSON_RESPONSE=$(cat response.json)
+JSON_RESPONSE=$(cat update-site-env-response.json)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  echo $JSON_RESPONSE
+  echo "$JSON_RESPONSE"
   echo ""
 fi
 
@@ -630,7 +638,7 @@ fi
 echo ""
 echo "* Setup deploy script"
 
-cp /github/workspace/$INPUT_DEPLOY_SCRIPT_STUB_PATH deploy-script
+cp "$WORKSPACE/$INPUT_DEPLOY_SCRIPT_STUB_PATH" deploy-script
 
 sed -i -e "s#STUB_HOST#$INPUT_HOST#" deploy-script
 
@@ -646,12 +654,12 @@ JSON_PAYLOAD='{
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] CURL POST on $API_URL with payload :"
-  echo $JSON_PAYLOAD
+  echo "$JSON_PAYLOAD"
   echo ""
 fi
 
 HTTP_STATUS=$(
-  curl -s -o response.json -w "%{http_code}" \
+  curl -s -o update-site-deployment-script-response.json -w "%{http_code}" \
     -X PUT \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -660,11 +668,11 @@ HTTP_STATUS=$(
     "$API_URL"
 )
 
-JSON_RESPONSE=$(cat response.json)
+JSON_RESPONSE=$(cat update-site-deployment-script-response.json)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  echo $JSON_RESPONSE
+  echo "$JSON_RESPONSE"
   echo ""
 fi
 
@@ -683,7 +691,7 @@ echo "* Launch deployment"
 API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment/deploy"
 
 HTTP_STATUS=$(
-  curl -s -o response.json -w "%{http_code}" \
+  curl -s -o deploy-site-response.json -w "%{http_code}" \
     -X POST \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -692,16 +700,15 @@ HTTP_STATUS=$(
 )
 
 if [[ $DEBUG == 'true' ]]; then
-  echo "[DEBUG] CURL POST on $API_URL with payload :"
-  echo $JSON_PAYLOAD
+  echo "[DEBUG] CURL POST on $API_URL"
   echo ""
 fi
 
-JSON_RESPONSE=$(cat response.json)
+JSON_RESPONSE=$(cat deploy-site-response.json)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  echo $JSON_RESPONSE
+  echo "$JSON_RESPONSE"
   echo ""
 fi
 
@@ -730,7 +737,7 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o check-site-deployment-response.json -w "%{http_code}" \
     -X GET \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -738,11 +745,11 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
     "$API_URL"
   )
 
-  JSON_RESPONSE=$(cat response.json)
+  JSON_RESPONSE=$(cat check-site-deployment-response.json)
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
@@ -780,7 +787,7 @@ if [[ $DEBUG == 'true' ]]; then
 fi
 
 HTTP_STATUS=$(
-curl -s -o response.json -w "%{http_code}" \
+curl -s -o last-deployment-response.json -w "%{http_code}" \
   -X GET \
   -H "$AUTH_HEADER" \
   -H "Accept: application/json" \
@@ -790,17 +797,17 @@ curl -s -o response.json -w "%{http_code}" \
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  cat response.json
+  cat last-deployment-response.json
   echo ""
 fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Fetched last deployment successfully "
-  echo "$(jq -r '.deployments[0]' response.json)" > last-deployment.json
+  jq -r '.deployments[0]' last-deployment-response.json > last-deployment.json
 else
   echo "Failed to launch deployment. HTTP status code: $HTTP_STATUS"
   echo "JSON Response:"
-  cat response.json
+  cat last-deployment-response.json
   exit 1
 fi
 
@@ -818,7 +825,7 @@ if [[ $DEBUG == 'true' ]]; then
 fi
 
 HTTP_STATUS=$(
-  curl -s -o response.json -w "%{http_code}" \
+  curl -s -o deployment-history-output-response.json -w "%{http_code}" \
     -X GET \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -826,17 +833,17 @@ HTTP_STATUS=$(
     "$API_URL"
 )
 
-JSON_RESPONSE=$(cat response.json)
+JSON_RESPONSE=$(cat deployment-history-output-response.json)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
-  echo $JSON_RESPONSE
+  echo "$JSON_RESPONSE"
   echo ""
 fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Fetched last deployment output successfully "
-  echo "$JSON_RESPONSE" > last-deployment-output.json
+  echo "$JSON_RESPONSE" > last-deployment-output-response.json
 else
   echo "Failed to launch deployment. HTTP status code: $HTTP_STATUS"
   echo "JSON Response:"
@@ -850,7 +857,7 @@ echo "* Check last deployment"
 LAST_DEPLOYMENT_DATA=$(cat last-deployment.json)
 LAST_DEPLOYMENT_STATUS=$(echo "$LAST_DEPLOYMENT_DATA" | jq -r '.status')
 LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq '.id')
-LAST_DEPLOYMENT_OUTPUT_DATA=$(cat last-deployment-output.json)
+LAST_DEPLOYMENT_OUTPUT_DATA=$(cat last-deployment-output-response.json)
 LAST_DEPLOYMENT_OUTPUT=$(echo "$LAST_DEPLOYMENT_OUTPUT_DATA" | jq -r '.output')
 
 if [[ $LAST_DEPLOYMENT_STATUS == 'finished' ]]; then
@@ -880,7 +887,7 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o setup-site-horizon-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
       -H "Accept: application/json" \
@@ -888,11 +895,11 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
       "$API_URL"
   )
 
-  JSON_RESPONSE=$(cat response.json)
+  JSON_RESPONSE=$(cat setup-site-horizon-response.json)
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
@@ -918,7 +925,7 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o setup-site-scheduler-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
       -H "Accept: application/json" \
@@ -926,11 +933,11 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
       "$API_URL"
   )
 
-  JSON_RESPONSE=$(cat response.json)
+  JSON_RESPONSE=$(cat setup-site-scheduler-response.json)
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
@@ -946,7 +953,7 @@ fi
 
 if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
   echo ""
-  echo "* Trigger quick deployment"
+  echo "* Enable quick deployment"
 
   API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment"
 
@@ -956,7 +963,7 @@ if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
   fi
 
   HTTP_STATUS=$(
-    curl -s -o response.json -w "%{http_code}" \
+    curl -s -o setup-site-quick-deploy-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
       -H "Accept: application/json" \
@@ -964,18 +971,18 @@ if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
       "$API_URL"
   )
 
-  JSON_RESPONSE=$(cat response.json)
+  JSON_RESPONSE=$(cat setup-site-quick-deploy-response.json)
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
   if [[ $HTTP_STATUS -eq 200 ]]; then
-    echo "Quick deployment triggered successfully"
+    echo "Enable quick deployment successfully"
   else
-    echo "Failed to trigger quick deployment. HTTP status code: $HTTP_STATUS"
+    echo "Failed to enable quick deployment. HTTP status code: $HTTP_STATUS"
     echo "JSON Response:"
     echo "$JSON_RESPONSE"
     exit 1
@@ -1001,7 +1008,7 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
-    echo $JSON_RESPONSE
+    echo "$JSON_RESPONSE"
     echo ""
   fi
 
@@ -1024,12 +1031,12 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     WORKER_ID=$(jq -r '.id' first_worker.json)
 
     if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
-      echo "worker_id=WORKER_ID" >> $GITHUB_OUTPUT
+      echo "worker_id=$WORKER_ID" >> $GITHUB_OUTPUT
     fi
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] first worker DATA JSON:"
-      echo $FIRST_WORKER_DATA
+      echo "$FIRST_WORKER_DATA"
       echo ""
     fi
 
@@ -1114,16 +1121,15 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
       fi
 
       HTTP_STATUS=$(
-        curl -s -o response.json -w "%{http_code}" \
+        curl -s -o delete-existing-site-worker-response.json -w "%{http_code}" \
           -X DELETE \
           -H "$AUTH_HEADER" \
           -H "Accept: application/json" \
           -H "Content-Type: application/json" \
-          -d "$JSON_PAYLOAD" \
           "$API_URL"
       )
 
-      JSON_RESPONSE=$(cat response.json)
+      JSON_RESPONSE=$(cat delete-existing-site-worker-response.json)
 
       if [[ $HTTP_STATUS -eq 200 ]]; then
         echo "Worker (ID $WORKER_ID) deleted successfully"
@@ -1172,12 +1178,12 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] CURL POST on $API_URL with payload :"
-      echo $JSON_PAYLOAD
+      echo "$JSON_PAYLOAD"
       echo ""
     fi
 
     HTTP_STATUS=$(
-      curl -s -o response.json -w "%{http_code}" \
+      curl -s -o create-site-worker-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
         -H "Accept: application/json" \
@@ -1186,21 +1192,20 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
         "$API_URL"
     )
 
-    JSON_RESPONSE=$(cat response.json)
+    JSON_RESPONSE=$(cat create-site-worker-response.json)
     if [[ $HTTP_STATUS -eq 200 ]]; then
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] response JSON:"
-        echo $JSON_RESPONSE
+        echo "$JSON_RESPONSE"
         echo ""
       fi
+      WORKER_ID=$(jq -r '.worker.id' create-site-worker-response.json)
+      echo "Worker (ID $WORKER_ID) created successfully"
     else
       echo "Failed to create worker. HTTP status code: $HTTP_STATUS"
       echo "JSON Response:"
       echo "$JSON_RESPONSE"
       exit 1
     fi
-
-    WORKER_ID=$(jq -r '.worker.id' response.json)
-    echo "Worker (ID $WORKER_ID) created successfully"
   fi
 fi
