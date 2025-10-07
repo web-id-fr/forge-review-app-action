@@ -1,0 +1,25 @@
+{
+  "name": "forge-review-app-action",
+  "version": "1.0.0",
+  "description": "Create/update and deploy a review-application on Laravel Forge with GitHub action",
+  "scripts": {
+    "test": "bats test/*.bats",
+    "test:verbose": "bats --verbose-run test/*.bats",
+    "test:tap": "bats --formatter tap test/*.bats"
+  },
+  "devDependencies": {
+    "bats": "^1.10.0",
+    "bats-mock": "^1.2.5",
+    "bats-support": "^0.3.0",
+    "bats-assert": "^2.0.0"
+  },
+  "keywords": [
+    "github-action",
+    "laravel",
+    "forge",
+    "review-app",
+    "deployment"
+  ],
+  "author": "Ryan Gilles",
+  "license": "MIT"
+}
