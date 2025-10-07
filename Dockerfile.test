@@ -1,3 +1,14 @@
 FROM bats/bats
 
-RUN apk add --no-cache bash curl jq shellcheck
+RUN apk add --no-cache bash curl jq shellcheck nodejs npm
+
+WORKDIR /code
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install npm dependencies
+RUN npm install
+
+# Copy the rest of your code
+COPY . .
