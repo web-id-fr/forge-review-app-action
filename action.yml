@@ -160,62 +160,13 @@ inputs:
 outputs:
   host:
     description: 'Host of the review-app (generated or forced one in inputs)'
-    value: ${{ steps.forge-review-app-action.outputs.host }}
   database_name:
     description: 'Database name of the review-app (generated or forced one in inputs)'
-    value: ${{ steps.forge-review-app-action.outputs.database_name }}
   site_id:
     description: 'Forge site ID of the review-app'
-    value: ${{ steps.forge-review-app-action.outputs.site_id }}
   worker_id:
     description: 'Worker ID'
-    value: ${{ steps.forge-review-app-action.outputs.worker_id }}
 
 runs:
-  using: 'composite'
-  steps:
-    - name: "Forge Review-app Action"
-      id: forge-review-app-action
-      uses: "docker://ghcr.io/web-id-fr/forge-review-app-action:v1"
-      env:
-        INPUT_FORGE_API_TOKEN: ${{ inputs.forge_api_token }}
-        INPUT_FORGE_SERVER_ID: ${{ inputs.forge_server_id }}
-        INPUT_ROOT_DOMAIN: ${{ inputs.root_domain }}
-        INPUT_HOST: ${{ inputs.host }}
-        INPUT_PREFIX_WITH_PR_NUMBER: ${{ inputs.prefix_with_pr_number }}
-        INPUT_FQDN_PREFIX: ${{ inputs.fqdn_prefix }}
-        INPUT_PROJECT_TYPE: ${{ inputs.project_type }}
-        INPUT_DIRECTORY: ${{ inputs.directory }}
-        INPUT_ISOLATED: ${{ inputs.isolated }}
-        INPUT_PHP_VERSION: ${{ inputs.php_version }}
-        INPUT_CREATE_DATABASE: ${{ inputs.create_database }}
-        INPUT_DATABASE_USER: ${{ inputs.database_user }}
-        INPUT_DATABASE_PASSWORD: ${{ inputs.database_password }}
-        INPUT_DATABASE_NAME: ${{ inputs.database_name }}
-        INPUT_DATABASE_NAME_PREFIX: ${{ inputs.database_name_prefix }}
-        INPUT_NGINX_TEMPLATE: ${{ inputs.nginx_template }}
-        INPUT_CONFIGURE_REPOSITORY: ${{ inputs.configure_repository }}
-        INPUT_REPOSITORY_PROVIDER: ${{ inputs.repository_provider }}
-        INPUT_REPOSITORY: ${{ inputs.repository }}
-        INPUT_BRANCH: ${{ inputs.branch }}
-        INPUT_COMPOSER: ${{ inputs.composer }}
-        INPUT_LETSENCRYPT_CERTIFICATE: ${{ inputs.letsencrypt_certificate }}
-        INPUT_CERTIFICATE_SETUP_TIMEOUT: ${{ inputs.certificate_setup_timeout }}
-        INPUT_ENV_STUB_PATH: ${{ inputs.env_stub_path }}
-        INPUT_DEPLOY_SCRIPT_STUB_PATH: ${{ inputs.deploy_script_stub_path }}
-        INPUT_DEPLOYMENT_TIMEOUT: ${{ inputs.deployment_timeout }}
-        INPUT_DEPLOYMENT_AUTO_SOURCE: ${{ inputs.deployment_auto_source }}
-        INPUT_CREATE_WORKER: ${{ inputs.create_worker }}
-        INPUT_WORKER_CONNECTION: ${{ inputs.worker_connection }}
-        INPUT_WORKER_TIMEOUT: ${{ inputs.worker_timeout }}
-        INPUT_WORKER_SLEEP: ${{ inputs.worker_sleep }}
-        INPUT_WORKER_TRIES: ${{ inputs.worker_tries }}
-        INPUT_WORKER_PROCESSES: ${{ inputs.worker_processes }}
-        INPUT_WORKER_STOPWAITSECS: ${{ inputs.worker_stopwaitsecs }}
-        INPUT_WORKER_PHP_VERSION: ${{ inputs.worker_php_version }}
-        INPUT_WORKER_DAEMON: ${{ inputs.worker_daemon }}
-        INPUT_WORKER_FORCE: ${{ inputs.worker_force }}
-        INPUT_WORKER_QUEUE: ${{ inputs.worker_queue }}
-        INPUT_HORIZON_ENABLED: ${{ inputs.horizon_enabled }}
-        INPUT_SCHEDULER_ENABLED: ${{ inputs.scheduler_enabled }}
-        INPUT_QUICK_DEPLOY_ENABLED: ${{ inputs.quick_deploy_enabled }}
+  using: 'docker'
+  image: 'Dockerfile'
