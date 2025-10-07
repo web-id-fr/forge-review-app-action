@@ -168,6 +168,37 @@ jobs:
           database_password: ${{ secrets.FORGE_DB_PASSWORD }}
 ```
 
+## Testing
+
+We use [bats-core](https://github.com/bats-core/bats-core) for tests.
+
+
+### Using Docker
+
+Run tests using docker, locally:
+
+```bash
+docker run --rm -it $(docker build -q -f Dockerfile.test .) /code/test
+```
+
+### From your host
+
+Prerequisites:
+
+- bash
+- curl
+- jq
+- shellcheck
+- nodejs
+- npm
+
+Setup bats-core dependencies using npm, then run tests:
+
+```bash
+npm install
+npm run test
+```
+
 ## Credits
 
 - [Ryan Gilles](https://www.linkedin.com/in/ryan-gilles-293680174/)
