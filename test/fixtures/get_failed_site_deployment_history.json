@@ -1,0 +1,17 @@
+{
+  "deployments": [
+    {
+      "id": 71,
+      "server_id": 196,
+      "site_id": 110,
+      "type": 4,
+      "commit_hash": "1aa50f0e4c49fed3a2335e866b03d4178ab93c4e",
+      "commit_author": "Dries Vints",
+      "commit_message": "Merge branch '8.x'\n\n# Conflicts:\n#\tCHANGELOG.md",
+      "started_at": "2020-11-05 12:56:05",
+      "ended_at": "2020-11-05 12:56:11",
+      "status": "failed",
+      "displayable_type": "Deployment API"
+    }
+  ]
+}

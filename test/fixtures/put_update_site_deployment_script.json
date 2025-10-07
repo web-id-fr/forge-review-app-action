@@ -1,0 +1,4 @@
+{
+  "content": "cd /home/forge/1-test-branch\ngit fetch\ngit reset --hard origin/$FORGE_SITE_BRANCH\n\nsed -i -e \"s#APP_VERSION=.*#APP_VERSION='$(git rev-parse --short HEAD)'#\" .env\n\n$FORGE_COMPOSER install --no-ansi --no-interaction --no-plugins --no-progress --no-suggest --optimize-autoloader\n$FORGE_PHP artisan migrate --force\n$FORGE_PHP artisan key:generate\n$FORGE_PHP artisan migrate:fresh --seed --force\n$FORGE_PHP artisan optimize:clear\n$FORGE_PHP artisan optimize\n$FORGE_PHP artisan storage:link\n",
+  "auto_source": true
+}

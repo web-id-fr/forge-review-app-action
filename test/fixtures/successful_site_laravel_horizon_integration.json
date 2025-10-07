@@ -1,0 +1,14 @@
+{
+  "daemon": {
+    "command": "php8.3 artisan horizon",
+    "user": "forge",
+    "directory": "/home/forge/foo.com",
+    "processes": 1,
+    "startsecs": 1,
+    "stopwaitsecs": 5,
+    "stopsignal": "SIGTERM",
+    "status": "installing",
+    "created_at": "2024-07-04 08:34:26",
+    "id": 2
+  }
+}
