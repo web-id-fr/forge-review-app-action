@@ -1,0 +1,12 @@
+{
+  "job": {
+    "command": "php8.3 /home/forge/forging.site/artisan schedule:run",
+    "user": "forge",
+    "frequency": "Minutely",
+    "cron": "* * * * *",
+    "status": "installing",
+    "created_at": "2024-07-08 08:55:39",
+    "id": 7,
+    "next_run_time": "2024-07-08T08:56:00+00:00"
+  }
+}

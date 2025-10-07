@@ -1,0 +1,10 @@
+{
+  "certificate": {
+    "domain": "domain.com",
+    "request_status": "creating",
+    "created_at": "2016-12-17 07:02:35",
+    "id": 3,
+    "existing": false,
+    "active": false
+  }
+}
