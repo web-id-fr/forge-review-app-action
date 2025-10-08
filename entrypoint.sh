@@ -84,7 +84,9 @@ if [[ -n "$INPUT_ALIASES" ]]; then
   echo "* Processing aliases: $INPUT_ALIASES"
 
   # Convert comma-separated aliases to array and trim whitespace
-  IFS=',' read -ra ALIASES <<< "$INPUT_ALIASES"
+  IFS=',' read -ra ALIASES << EOF
+$INPUT_ALIASES
+EOF
   ALIAS_DOMAINS=""
 
   for alias in "${ALIASES[@]}"; do
@@ -587,7 +589,9 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     # Convert comma-separated domains to JSON array
     DOMAINS_JSON_ARRAY=""
-    IFS=',' read -ra DOMAIN_ARRAY <<< "$ALL_DOMAINS"
+    IFS=',' read -ra DOMAIN_ARRAY << EOF
+$ALL_DOMAINS
+EOF
     for domain in "${DOMAIN_ARRAY[@]}"; do
       # Trim whitespace
       domain=$(echo "$domain" | xargs)

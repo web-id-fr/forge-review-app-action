@@ -30,3 +30,17 @@ load '../node_modules/bats-assert/load'
         skip "shellcheck not installed"
     fi
 }
+
+@test "Script runs with /bin/sh" {
+    # Verify the script doesn't use bash-specific syntax
+    # This ensures it can run in environments where /bin/sh is not bash
+    run sh -n "$BATS_TEST_DIRNAME/../entrypoint.sh"
+    assert_success
+}
+
+@test "Script does not use bash here-strings (<<<)" {
+    # The here-string syntax (<<<) is bash-specific and causes errors in POSIX sh
+    # This test ensures we use POSIX-compatible heredocs instead
+    run grep -n '<<<' "$BATS_TEST_DIRNAME/../entrypoint.sh"
+    assert_failure
+}
