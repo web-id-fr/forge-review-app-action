@@ -1,7 +1,7 @@
 #!/bin/bash
 
 setup_workspace() {
-    export TEST_TMP_DIR="$(mktemp -d)"
+    export TEST_TMP_DIR="$BATS_TEST_TMPDIR"
     export GITHUB_WORKSPACE="$TEST_TMP_DIR"
     cd "$GITHUB_WORKSPACE"
 
@@ -113,7 +113,8 @@ teardown_workspace() {
 
 setup_curl_mock() {
     # Create temporary directory for mock
-    export MOCK_DIR=$(mktemp -d)
+    export MOCK_DIR="$BATS_TEST_TMPDIR/curl_mock"
+    mkdir -p "$MOCK_DIR"
 
     # Create the mock curl script
     cat > "$MOCK_DIR/curl" << EOF

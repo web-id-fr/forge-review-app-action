@@ -274,6 +274,25 @@ setup_successful_common_curl_mocks() {
   assert_output --partial "Laravel Horizon integration enabled successfully"
 }
 
+@test "Laravel Horizon integration enabled successfully with HTTP 201" {
+  setup_successful_common_curl_mocks
+
+  mock_curl_response \
+    "POST" \
+    "https://forge.laravel.com/api/v1/servers/123/sites/1/integrations/horizon" \
+    "successful_site_laravel_horizon_integration.json" \
+    "201"
+
+  export INPUT_HORIZON_ENABLED="true"
+
+  run "$BATS_TEST_DIRNAME/../entrypoint.sh"
+
+  #debug_output
+
+  assert_success
+  assert_output --partial "Laravel Horizon integration enabled successfully"
+}
+
 @test "Laravel Scheduler integration enabled successfully" {
   setup_successful_common_curl_mocks
 
@@ -287,8 +306,46 @@ setup_successful_common_curl_mocks() {
   assert_output --partial "Laravel Scheduler integration enabled successfully"
 }
 
+@test "Laravel Scheduler integration enabled successfully with HTTP 201" {
+  setup_successful_common_curl_mocks
+
+  mock_curl_response \
+    "POST" \
+    "https://forge.laravel.com/api/v1/servers/123/sites/1/integrations/laravel-scheduler" \
+    "successful_site_laravel_scheduler_integration.json" \
+    "201"
+
+  export INPUT_SCHEDULER_ENABLED="true"
+
+  run "$BATS_TEST_DIRNAME/../entrypoint.sh"
+
+  #debug_output
+
+  assert_success
+  assert_output --partial "Laravel Scheduler integration enabled successfully"
+}
+
 @test "Enable quick deployment successfully" {
   setup_successful_common_curl_mocks
+
+  export INPUT_QUICK_DEPLOY_ENABLED="true"
+
+  run "$BATS_TEST_DIRNAME/../entrypoint.sh"
+
+  #debug_output
+
+  assert_success
+  assert_output --partial "Enable quick deployment successfully"
+}
+
+@test "Enable quick deployment successfully with HTTP 201" {
+  setup_successful_common_curl_mocks
+
+  mock_curl_response \
+    "POST" \
+    "https://forge.laravel.com/api/v1/servers/123/sites/1/deployment" \
+    "successful_enable_site_quick_deployment.json" \
+    "201"
 
   export INPUT_QUICK_DEPLOY_ENABLED="true"
 

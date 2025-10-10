@@ -903,7 +903,7 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 ]]; then
+  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
     echo "Laravel Horizon integration enabled successfully"
   else
     echo "Failed to enable Laravel Horizon integration. HTTP status code: $HTTP_STATUS"
@@ -941,7 +941,7 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 ]]; then
+  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
     echo "Laravel Scheduler integration enabled successfully"
   else
     echo "Failed to enable Laravel Scheduler integration. HTTP status code: $HTTP_STATUS"
@@ -979,7 +979,7 @@ if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 ]]; then
+  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
     echo "Enable quick deployment successfully"
   else
     echo "Failed to enable quick deployment. HTTP status code: $HTTP_STATUS"
