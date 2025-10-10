@@ -79,6 +79,7 @@ fi
 
 # Process aliases if provided
 ALL_DOMAINS="$INPUT_HOST"
+ALIASES_JSON_ARRAY=""
 if [[ -n "$INPUT_ALIASES" ]]; then
   echo ""
   echo "* Processing aliases: $INPUT_ALIASES"
@@ -119,6 +120,13 @@ EOF
         ALIAS_DOMAINS="$ALIAS_DOMAINS,$ALIAS_DOMAIN"
       else
         ALIAS_DOMAINS="$ALIAS_DOMAIN"
+      fi
+
+      # Build JSON array for aliases
+      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
+        ALIASES_JSON_ARRAY="$ALIASES_JSON_ARRAY, \"$ALIAS_DOMAIN\""
+      else
+        ALIASES_JSON_ARRAY="\"$ALIAS_DOMAIN\""
       fi
 
       echo "  - Created alias: $ALIAS_DOMAIN"
@@ -324,25 +332,6 @@ if [[ $RA_FOUND == 'false' ]]; then
 
   API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
 
-  # Build aliases JSON array if aliases were configured
-  ALIASES_JSON_ARRAY=""
-  if [[ -n "$ALIAS_DOMAINS" ]]; then
-    IFS=',' read -ra ALIAS_ARRAY << EOF
-$ALIAS_DOMAINS
-EOF
-    for alias_domain in "${ALIAS_ARRAY[@]}"; do
-      # Trim whitespace
-      alias_domain=$(echo "$alias_domain" | xargs)
-      if [[ -n "$alias_domain" ]]; then
-        if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-          ALIASES_JSON_ARRAY="$ALIASES_JSON_ARRAY, \"$alias_domain\""
-        else
-          ALIASES_JSON_ARRAY="\"$alias_domain\""
-        fi
-      fi
-    done
-  fi
-
   # Build JSON payload incrementally
   # Start with base properties (always present)
   JSON_PAYLOAD='{
@@ -528,22 +517,12 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/letsencrypt"
 
-    # Convert comma-separated domains to JSON array
-    DOMAINS_JSON_ARRAY=""
-    IFS=',' read -ra DOMAIN_ARRAY << EOF
-$ALL_DOMAINS
-EOF
-    for domain in "${DOMAIN_ARRAY[@]}"; do
-      # Trim whitespace
-      domain=$(echo "$domain" | xargs)
-      if [[ -n "$domain" ]]; then
-        if [[ -n "$DOMAINS_JSON_ARRAY" ]]; then
-          DOMAINS_JSON_ARRAY="$DOMAINS_JSON_ARRAY, \"$domain\""
-        else
-          DOMAINS_JSON_ARRAY="\"$domain\""
-        fi
-      fi
-    done
+    # Build domains JSON array by combining main host with aliases
+    if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
+      DOMAINS_JSON_ARRAY="\"$INPUT_HOST\", $ALIASES_JSON_ARRAY"
+    else
+      DOMAINS_JSON_ARRAY="\"$INPUT_HOST\""
+    fi
 
     JSON_PAYLOAD='{
       "domains": ['"$DOMAINS_JSON_ARRAY"']
