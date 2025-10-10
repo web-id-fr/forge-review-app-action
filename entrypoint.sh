@@ -343,95 +343,36 @@ EOF
     done
   fi
 
+  # Build JSON payload incrementally
+  # Start with base properties (always present)
+  JSON_PAYLOAD='{
+    "domain": "'"$INPUT_HOST"'",
+    "project_type": "'"$INPUT_PROJECT_TYPE"'",
+    "directory": "'"$INPUT_DIRECTORY"'",
+    "isolated": '"$INPUT_ISOLATED"',
+    "php_version": "'"$INPUT_PHP_VERSION"'"'
+
+  # Add database if requested
   if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
-    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
-      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'",
-          "aliases": ['"$ALIASES_JSON_ARRAY"']
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'"
-        }'
-      fi
-    else
-      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'",
-          "aliases": ['"$ALIASES_JSON_ARRAY"']
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "database": "'"$INPUT_DATABASE_NAME"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
-        }'
-      fi
-    fi
-  else
-    if [[ -z "$INPUT_NGINX_TEMPLATE" ]]; then
-      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "aliases": ['"$ALIASES_JSON_ARRAY"']
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'"
-        }'
-      fi
-    else
-      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'",
-          "aliases": ['"$ALIASES_JSON_ARRAY"']
-        }'
-      else
-        JSON_PAYLOAD='{
-          "domain": "'"$INPUT_HOST"'",
-          "project_type": "'"$INPUT_PROJECT_TYPE"'",
-          "directory": "'"$INPUT_DIRECTORY"'",
-          "isolated": '"$INPUT_ISOLATED"',
-          "php_version": "'"$INPUT_PHP_VERSION"'",
-          "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
-        }'
-      fi
-    fi
+    JSON_PAYLOAD="$JSON_PAYLOAD"',
+    "database": "'"$INPUT_DATABASE_NAME"'"'
   fi
+
+  # Add nginx_template if provided
+  if [[ -n "$INPUT_NGINX_TEMPLATE" ]]; then
+    JSON_PAYLOAD="$JSON_PAYLOAD"',
+    "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"'
+  fi
+
+  # Add aliases if configured
+  if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
+    JSON_PAYLOAD="$JSON_PAYLOAD"',
+    "aliases": ['"$ALIASES_JSON_ARRAY"']'
+  fi
+
+  # Close JSON object
+  JSON_PAYLOAD="$JSON_PAYLOAD"'
+  }'
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL POST on $API_URL with payload :"
