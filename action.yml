@@ -19,6 +19,9 @@ inputs:
   host:
     description: 'Site host of the review-app'
     required: false
+  aliases:
+    description: 'Site aliases of the review-app'
+    required: false
   prefix_with_pr_number:
     description: 'Use the pull-request number as host and database prefix when host is not manually defined'
     required: false

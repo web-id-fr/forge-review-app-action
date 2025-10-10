@@ -73,6 +73,10 @@ if [[ -z "$INPUT_HOST" ]]; then
   fi
 fi
 
+if [[ -z "$INPUT_FULL_DOMAIN" ]]; then
+  INPUT_FULL_DOMAIN=$(echo "$INPUT_HOST" | sed "s/^$INPUT_FQDN_PREFIX//")
+fi
+
 if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
   echo "host=$INPUT_HOST" >> $GITHUB_OUTPUT
 fi
@@ -307,6 +311,22 @@ if [[ $RA_FOUND == 'false' ]]; then
         "php_version": "'"$INPUT_PHP_VERSION"'",
         "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"
       }'
+    fi
+  fi
+
+  if [[ -n "$INPUT_ALIASES" ]]; then
+    if ! echo "$INPUT_ALIASES" | jq empty; then
+      echo "Invalid JSON format for aliases: $INPUT_ALIASES"
+      exit 1
+    fi
+
+    if ! echo "$INPUT_ALIASES" | jq -e 'if type == "array" then . else empty end' > /dev/null; then
+      echo "Aliases should be a JSON array: $INPUT_ALIASES"
+      exit 1
+    fi
+
+    if [[ -n "$INPUT_ALIASES" ]]; then
+      JSON_PAYLOAD=$(echo "$JSON_PAYLOAD" | jq --argjson aliases "$INPUT_ALIASES" '. + {aliases: $aliases}')
     fi
   fi
 
@@ -575,6 +595,7 @@ if [[ $DEBUG == 'true' ]]; then
   echo ""
 fi
 
+sed -i -e "s#STUB_FULL_DOMAIN#$INPUT_FULL_DOMAIN#" .env
 sed -i -e "s#STUB_HOST#$INPUT_HOST#" .env
 sed -i -e "s#STUB_DATABASE_NAME#$INPUT_DATABASE_NAME#" .env
 sed -i -e "s#STUB_DATABASE_USER#$INPUT_DATABASE_USER#" .env
