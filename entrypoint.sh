@@ -598,10 +598,11 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       fi
 
       if [[ "$HTTP_STATUS" != "200" ]]; then
-        echo "Response code is not 200 but $HTTP_STATUS"
-        echo "API Response:"
-        echo "$JSON_RESPONSE"
-        exit 1
+        echo "Response code $HTTP_STATUS, retrying in 5 seconds..."
+        sleep 5
+        current_time=$(date +%s)
+        elapsed_time=$((current_time - start_time))
+        continue
       fi
 
       status=$(echo "$JSON_RESPONSE" | jq -r '.certificate."status"')
