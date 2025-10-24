@@ -404,6 +404,8 @@ if [[ $RA_FOUND == 'false' ]]; then
     else
       echo "New site (ID $SITE_ID) created successfully"
     fi
+    echo "Wait for 10 seconds..."
+    sleep 10
   else
     echo "Failed to create new site. HTTP status code: $HTTP_STATUS"
     echo "JSON Response:"
@@ -464,6 +466,8 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
 
     if [[ $HTTP_STATUS -eq 200 ]]; then
       echo "Git repository configured successfully"
+      echo "Wait for 10 seconds..."
+      sleep 10
     else
       echo "Failed to setup git repository on Forge site. HTTP status code: $HTTP_STATUS"
       echo "JSON Response:"
