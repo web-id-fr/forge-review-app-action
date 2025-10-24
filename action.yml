@@ -159,6 +159,10 @@ inputs:
   aliases:
     description: 'Comma-separated list of aliases to create based on the main host (e.g., "clientes, www")'
     required: false
+  debug:
+    description: 'Enable DEBUG mode'
+    required: false
+    default: 'false'
 
 outputs:
   host:

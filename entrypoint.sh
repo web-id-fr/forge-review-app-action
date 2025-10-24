@@ -7,6 +7,10 @@ if [[ -z "$DEBUG" ]]; then
   DEBUG='false'
 fi
 
+if [[ -n "$INPUT_DEBUG" ]]; then
+  DEBUG="$INPUT_DEBUG"
+fi
+
 if [[ $DEBUG == 'true' ]]; then
   echo "!!! DEBUG MODE ENABLED !!!"
 fi
