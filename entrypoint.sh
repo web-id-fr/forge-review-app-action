@@ -1270,3 +1270,123 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     fi
   fi
 fi
+
+if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
+  echo ""
+  echo '* Get Forge server site security rules'
+  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules"
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] CURL GET on $API_URL"
+    echo ""
+  fi
+
+  JSON_RESPONSE=$(
+    curl -s -H "$AUTH_HEADER" \
+      -H "Accept: application/json" \
+      "$API_URL"
+  )
+  echo "$JSON_RESPONSE" > security-rules.json
+
+  if [[ $DEBUG == 'true' ]]; then
+    echo "[DEBUG] response JSON:"
+    echo "$JSON_RESPONSE"
+    echo ""
+  fi
+
+  # Check if security rule exists
+  SECURITY_RULE_EXISTS=$(jq -r '(.security_rules | length) > 0' security-rules.json)
+
+  if [[ $SECURITY_RULE_EXISTS == 'false' ]]; then
+    echo "Security rule not found"
+  fi
+
+  if [[ $SECURITY_RULE_EXISTS == 'true' ]]; then
+    echo "Security rule found"
+    echo ""
+    echo "* Delete existing security rule"
+
+    FIRST_SECURITY_RULE_DATA=$(jq -r '.security_rules[0]' security-rules.json)
+
+    echo "$FIRST_SECURITY_RULE_DATA" > first_security_rule.json
+    SECURITY_RULE_ID=$(jq -r '.id' first_security_rule.json)
+
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules/$SECURITY_RULE_ID"
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL DELETE on $API_URL"
+      echo ""
+    fi
+
+    HTTP_STATUS=$(
+      curl -s -o delete-existing-site-security-rule-response.json -w "%{http_code}" \
+        -X DELETE \
+        -H "$AUTH_HEADER" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat delete-existing-site-security-rule-response.json)
+
+    if [[ $HTTP_STATUS -eq 200 ]]; then
+      echo "Security rule (ID $SECURITY_RULE_ID) deleted successfully"
+      SECURITY_RULE_EXISTS='false'
+    else
+      echo "Failed to delete security rule (ID $SECURITY_RULE_ID). HTTP status code: $HTTP_STATUS"
+      echo "JSON Response:"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
+  fi
+
+  if [[ $SECURITY_RULE_EXISTS == 'false' ]]; then
+    echo ""
+    echo "* Create review-app security rule"
+
+    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules"
+
+    JSON_PAYLOAD='{
+      "name": "Access Restricted",
+      "path": null,
+      "credentials": [
+        {
+          "username": "'"$INPUT_SECURITY_RULE_USERNAME"'",
+          "password": "'"$INPUT_SECURITY_RULE_PASSWORD"'"
+        }
+      ]
+    }'
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL POST on $API_URL with payload :"
+      echo "$JSON_PAYLOAD"
+      echo ""
+    fi
+
+    HTTP_STATUS=$(
+      curl -s -o create-site-security-rule-response.json -w "%{http_code}" \
+        -X POST \
+        -H "$AUTH_HEADER" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        -d "$JSON_PAYLOAD" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat create-site-security-rule-response.json)
+    if [[ $HTTP_STATUS -eq 200 ]]; then
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] response JSON:"
+        echo "$JSON_RESPONSE"
+        echo ""
+      fi
+      SECURITY_RULE_ID=$(jq -r '.security_rule.id' create-site-security-rule-response.json)
+      echo "Security rule (ID $SECURITY_RULE_ID) created successfully"
+    else
+      echo "Failed to create security rule. HTTP status code: $HTTP_STATUS"
+      echo "JSON Response:"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
+  fi
+fi

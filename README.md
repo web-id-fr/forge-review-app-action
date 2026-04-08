@@ -141,7 +141,10 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `horizon_enabled`           | no       | `false`                                | Enable Laravel Horizon integration.                                                                                                         |
 | `scheduler_enabled`         | no       | `false`                                | Enable Laravel Scheduler integration.                                                                                                       |
 | `quick_deploy_enabled`      | no       | `false`                                | Enable quick deployment trigger.                                                                                                            |
-| `aliases`                   | no       |                                        | Comma-separated list of aliases to create based on the main host (e.g., "clientes, www"). These will be added to the SSL certificate.    |
+| `aliases`                   | no       |                                        | Comma-separated list of aliases to create based on the main host (e.g., "clientes, www"). These will be added to the SSL certificate.       |
+| `security_rule_enabled`     | no       | `false`                                | Enable security rule (Basic Auth).                                                                                                          |
+| `security_rule_username`    | no       | `false`                                | Security rule username (Basic Auth, if enabled).                                                                                            |
+| `security_rule_password`    | no       | `false`                                | Security rule password (Basic Auth, if enabled).                                                                                            |
 
 
 ## Outputs
