@@ -413,7 +413,9 @@ if [[ $RA_FOUND == 'false' ]]; then
     "web_directory": "'"$INPUT_DIRECTORY"'",
     "is_isolated": '"$INPUT_ISOLATED"',
     "php_version": "'"$INPUT_PHP_VERSION"'",
-    "push_to_deploy": '"$INPUT_QUICK_DEPLOY_ENABLED"''
+    "push_to_deploy": '"$INPUT_QUICK_DEPLOY_ENABLED"',
+    "www_redirect_type": "none",
+    "allow_wildcard_subdomains": false'
 
   if [[ -n "$DATABASE_ID" ]]; then
     JSON_PAYLOAD="$JSON_PAYLOAD"',
