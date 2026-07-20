@@ -102,6 +102,7 @@ EOF
     export GITHUB_REPOSITORY="owner/repo"
     export GITHUB_HEAD_REF="test-branch"
     export GITHUB_REF_NAME="test-branch-1"
+    export INPUT_FORGE_ORGANIZATION="test-org"
     export INPUT_FORGE_SERVER_ID="123"
     export INPUT_FORGE_API_TOKEN="test-token"
     export INPUT_BRANCH="test-branch"
@@ -169,27 +170,26 @@ fi
 
 response_key="\${method}|\${url}"
 
-# Find the mock response file
+# Find the mock response file (last matching registration wins, so a test
+# can override a response registered earlier by a shared setup helper)
 mock_response_file=""
 if [[ -f "\$MOCK_RESPONSES_FILE" ]]; then
     while IFS= read -r line; do
         if [[ "\$line" == "\${response_key}="* ]]; then
-            mock_response_file="\${line#*=}"
-            # If it's not an absolute path, assume it's relative to fixtures dir
-            if [[ "\$mock_response_file" != /* ]]; then
-                mock_response_file="\$FIXTURES_DIR/\$mock_response_file"
-            fi
-            break
+            mock_response_file="\${line#"\${response_key}="}"
         fi
     done < "\$MOCK_RESPONSES_FILE"
+    # If it's not an absolute path, assume it's relative to fixtures dir
+    if [[ -n "\$mock_response_file" && "\$mock_response_file" != /* ]]; then
+        mock_response_file="\$FIXTURES_DIR/\$mock_response_file"
+    fi
 fi
 
-# Find the status code for this request
+# Find the status code for this request (last matching registration wins)
 if [[ -f "\$MOCK_STATUS_CODES_FILE" ]]; then
     while IFS= read -r line; do
         if [[ "\$line" == "\${response_key}="* ]]; then
-            status_code="\${line#*=}"
-            break
+            status_code="\${line#"\${response_key}="}"
         fi
     done < "\$MOCK_STATUS_CODES_FILE"
 fi

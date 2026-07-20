@@ -1,0 +1,11 @@
+{
+  "data": [
+    {
+      "id": 71,
+      "type": "deployments",
+      "attributes": {
+        "status": "finished"
+      }
+    }
+  ]
+}

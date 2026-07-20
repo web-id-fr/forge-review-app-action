@@ -1,0 +1,9 @@
+{
+  "data": {
+    "id": 71,
+    "type": "deployment-logs",
+    "attributes": {
+      "output": "Cloning repository...\nInstalling dependencies...\nDeployment finished."
+    }
+  }
+}

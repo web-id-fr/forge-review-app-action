@@ -19,36 +19,48 @@ teardown() {
 @test "Certificate polling retries on 404 instead of failing immediately" {
   mock_curl_response \
     "GET" \
-    "https://forge.laravel.com/api/v1/servers/123/sites" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites?filter%5Bname%5D=1-test-branch.test.com" \
     "get_sites_without_existing_site.json"
 
   mock_curl_response \
     "POST" \
-    "https://forge.laravel.com/api/v1/servers/123/sites" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites" \
     "post_create_site.json" \
-    "200"
+    "202"
 
   mock_curl_response \
-    "POST" \
-    "https://forge.laravel.com/api/v1/servers/123/sites/1/git" \
-    "post_setup_site_git.json" \
+    "GET" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1" \
+    "get_site_status_installed.json" \
     "200"
 
   mock_curl_response \
     "GET" \
-    "https://forge.laravel.com/api/v1/servers/123/sites/1/certificates" \
-    "get_site_certificates.json" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/domains" \
+    "get_site_domains_empty.json" \
     "200"
 
   mock_curl_response \
     "POST" \
-    "https://forge.laravel.com/api/v1/servers/123/sites/1/certificates/letsencrypt" \
-    "post_create_site_letsencrypt_certificate.json" \
-    "200"
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/domains" \
+    "post_create_domain.json" \
+    "202"
 
   mock_curl_response \
     "GET" \
-    "https://forge.laravel.com/api/v1/servers/123/sites/1/certificates/1" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/domains/10/certificates" \
+    "get_domain_certificates_empty.json" \
+    "200"
+
+  mock_curl_response \
+    "POST" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/domains/10/certificates" \
+    "post_create_certificate.json" \
+    "202"
+
+  mock_curl_response \
+    "GET" \
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/domains/10/certificates/100" \
     "get_certificate_404.json" \
     "404"
 
@@ -58,10 +70,9 @@ teardown() {
   export INPUT_DATABASE_NAME="test_db"
   export INPUT_DATABASE_USER="test_user"
   export INPUT_DATABASE_PASSWORD="test_pass"
-  export INPUT_INSTALL_COMPOSER_DEPENDENCIES="false"
-  export INPUT_CREATE_SUBDOMAIN="true"
+  export INPUT_COMPOSER="false"
   export INPUT_ALIASES=""
-  export INPUT_ENABLE_QUICK_DEPLOY="false"
+  export INPUT_QUICK_DEPLOY_ENABLED="false"
   export INPUT_CERTIFICATE_SETUP_TIMEOUT="10"
 
   run "$BATS_TEST_DIRNAME/../entrypoint.sh"

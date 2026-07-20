@@ -4,7 +4,7 @@
     "type": "sites",
     "attributes": {
       "name": "1-test-branch",
-      "status": "provisioning",
+      "status": "installed",
       "quick_deploy": false,
       "repository": {
         "provider": "github",

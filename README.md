@@ -94,6 +94,24 @@ String replacement map:
 | `STUB_HOST`              | Host name of the review-app site.    |
 
 
+## Upgrading to v2
+
+Starting with `v2`, this action uses [Forge API v2](https://forge.laravel.com/api-documentation), which is organized around organizations and servers instead of a flat list of servers as in v1. This is a breaking change if you are currently using `@v1` (or a `v1.x` tag).
+
+### What changes on the Forge side
+
+- Servers now belong to an **organization**, identified by its slug. The API base URL becomes `.../api/orgs/{organization}/servers/{server_id}/...` instead of `.../api/v1/servers/{server_id}/...`.
+- Background processes (workers) are always managed by supervisor and always run the server's default CLI PHP version. There is no longer a way to force a specific worker PHP version or to configure it as non-daemon via the API.
+
+### What you need to change in your workflow
+
+1. **Pin the action to `@v2`** instead of `@v1` (or a `v1.x` tag). `@v1` keeps working against the previous behavior for existing consumers, it will not receive the v2 changes.
+2. **Add the new required input `forge_organization`**, set to the slug of the organization that owns your server (visible in the Forge dashboard URL when browsing your server, e.g. `https://forge.laravel.com/servers/{organization-slug}/...`).
+3. **Drop `worker_php_version` and `worker_daemon` if you were setting them** — they are now ignored (no Forge API v2 equivalent) and will log a warning if provided. Workers keep using the server's default CLI PHP version and run under supervisor as before.
+4. Regenerate/verify your `forge_api_token` still has access to the organization and server you are targeting; API tokens are scoped the same way as before, but make sure the token owner has access to the organization.
+
+Everything else (inputs, outputs, stub files, aliases, security rule, Horizon/Scheduler/quick-deploy integrations) keeps working the same way.
+
 ## Inputs
 
 It is highly recommended that you store all inputs using [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets) or variables.
@@ -101,6 +119,7 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | Input                       | Required | Default                                | Description                                                                                                                                 |
 |-----------------------------|----------|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | `forge_api_token`           | yes      |                                        | Laravel Forge API key.<br>You can generate an API key in your [Forge dashboard](https://forge.laravel.com/user-profile/api).                |
+| `forge_organization`        | yes      |                                        | Laravel Forge organization slug the server belongs to.                                                                                      |
 | `forge_server_id`           | yes      |                                        | Laravel Forge server ID                                                                                                                     |
 | `root_domain`               | no       |                                        | Root domain under which to create review-app site.                                                                                          |
 | `host`                      | no       |                                        | Site host of the review-app.<br>The branch name the action is running on will be used to generate it if not defined (recommended).          |
@@ -134,8 +153,8 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `worker_tries`              | no       |                                        | Worker maximum tries (if creation is requested).                                                                                            |
 | `worker_processes`          | no       | `1`                                    | Worker processes (if creation is requested).                                                                                                |
 | `worker_stopwaitsecs`       | no       | `600`                                  | Worker stop wait secs (if creation is requested).                                                                                           |
-| `worker_php_version`        | no       |                                        | Worker PHP version (if creation is requested). `php_version` input value will be used if not defined.                                       |
-| `worker_daemon`             | no       | `true`                                 | Worker "daemon" (if creation is requested).                                                                                                 |
+| `worker_php_version`        | no       |                                        | *(Ignored, no Forge API v2 equivalent)* Worker PHP version (if creation is requested).                                                       |
+| `worker_daemon`             | no       | `true`                                 | *(Ignored, no Forge API v2 equivalent)* Worker "daemon" (if creation is requested).                                                          |
 | `worker_force`              | no       | `false`                                | Worker "force" (if creation is requested).                                                                                                  |
 | `worker_queue`              | no       |                                        | Worker queue (if creation is requested). Default queue will be used if not defined.                                                         |
 | `horizon_enabled`           | no       | `false`                                | Enable Laravel Horizon integration.                                                                                                         |
@@ -143,8 +162,8 @@ It is highly recommended that you store all inputs using [GitHub Secrets](https:
 | `quick_deploy_enabled`      | no       | `false`                                | Enable quick deployment trigger.                                                                                                            |
 | `aliases`                   | no       |                                        | Comma-separated list of aliases to create based on the main host (e.g., "clientes, www"). These will be added to the SSL certificate.       |
 | `security_rule_enabled`     | no       | `false`                                | Enable security rule (Basic Auth).                                                                                                          |
-| `security_rule_username`    | no       | `false`                                | Security rule username (Basic Auth, if enabled).                                                                                            |
-| `security_rule_password`    | no       | `false`                                | Security rule password (Basic Auth, if enabled).                                                                                            |
+| `security_rule_username`    | no       |                                        | Security rule username (Basic Auth, if enabled).                                                                                            |
+| `security_rule_password`    | no       |                                        | Security rule password (Basic Auth, if enabled).                                                                                            |
 
 
 ## Outputs
@@ -184,9 +203,10 @@ jobs:
 
     steps:
       - name: Deploy
-        uses: web-id-fr/forge-review-app-action@v1.0.0
+        uses: web-id-fr/forge-review-app-action@v2
         with:
           forge_api_token: ${{ secrets.FORGE_API_TOKEN }}
+          forge_organization: ${{ secrets.FORGE_ORGANIZATION }}
           forge_server_id: ${{ secrets.FORGE_SERVER_ID }}
           create_database: 'true'
           database_password: ${{ secrets.FORGE_DB_PASSWORD }}

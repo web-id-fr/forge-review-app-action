@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": 5,
+      "type": "background-processes",
+      "attributes": {
+        "name": "Queue Worker",
+        "command": "php artisan queue:work redis --sleep=60 --timeout=90",
+        "user": "forge",
+        "processes": 1,
+        "stopwaitsecs": 600
+      }
+    }
+  ]
+}

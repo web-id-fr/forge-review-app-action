@@ -1,0 +1,9 @@
+{
+  "data": {
+    "id": 7,
+    "type": "security-rules",
+    "attributes": {
+      "name": "Access Restricted"
+    }
+  }
+}
