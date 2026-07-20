@@ -429,22 +429,28 @@ if [[ $RA_FOUND == 'false' ]]; then
   fi
 
   if [[ -n "$INPUT_NGINX_TEMPLATE" ]]; then
-    echo ""
-    echo "* Resolve nginx template ID for '$INPUT_NGINX_TEMPLATE'"
+    if [[ "$INPUT_NGINX_TEMPLATE" =~ ^[0-9]+$ ]]; then
+      # Numeric input: use it directly as the nginx template ID (backward-compatible
+      # with existing consumers passing the raw ID, as the pre-v2 API did).
+      NGINX_TEMPLATE_ID="$INPUT_NGINX_TEMPLATE"
+    else
+      echo ""
+      echo "* Resolve nginx template ID for '$INPUT_NGINX_TEMPLATE'"
 
-    NGINX_TEMPLATE_URL="$API_BASE/nginx/templates?filter%5Bname%5D=$INPUT_NGINX_TEMPLATE"
+      NGINX_TEMPLATE_URL="$API_BASE/nginx/templates?filter%5Bname%5D=$INPUT_NGINX_TEMPLATE"
 
-    NGINX_TEMPLATE_RESPONSE=$(
-      curl -s -H "$AUTH_HEADER" \
-        -H "$ACCEPT_HEADER" \
-        "$NGINX_TEMPLATE_URL"
-    )
+      NGINX_TEMPLATE_RESPONSE=$(
+        curl -s -H "$AUTH_HEADER" \
+          -H "$ACCEPT_HEADER" \
+          "$NGINX_TEMPLATE_URL"
+      )
 
-    NGINX_TEMPLATE_ID=$(echo "$NGINX_TEMPLATE_RESPONSE" | jq -r '.data[] | select(.attributes.name == "'"$INPUT_NGINX_TEMPLATE"'") | .id' | head -n 1)
+      NGINX_TEMPLATE_ID=$(echo "$NGINX_TEMPLATE_RESPONSE" | jq -r '.data[] | select(.attributes.name == "'"$INPUT_NGINX_TEMPLATE"'") | .id' | head -n 1)
 
-    if [[ -z "$NGINX_TEMPLATE_ID" ]]; then
-      echo "Error: nginx template '$INPUT_NGINX_TEMPLATE' not found"
-      exit 1
+      if [[ -z "$NGINX_TEMPLATE_ID" ]]; then
+        echo "Error: nginx template '$INPUT_NGINX_TEMPLATE' not found"
+        exit 1
+      fi
     fi
 
     JSON_PAYLOAD="$JSON_PAYLOAD"',
