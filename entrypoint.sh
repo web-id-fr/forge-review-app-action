@@ -510,7 +510,9 @@ if [[ $RA_FOUND == 'false' ]]; then
   echo ""
   echo "* Wait for site to be installed"
 
-  API_URL="$API_BASE/sites/$SITE_ID"
+  # GET /sites/{id} is not supported by the Forge API v2 (only PUT/DELETE), so
+  # the site must be looked up by name instead.
+  API_URL="$API_BASE/sites?filter%5Bname%5D=$INPUT_HOST"
 
   start_time=$(date +%s)
   elapsed_time=0
@@ -523,7 +525,7 @@ if [[ $RA_FOUND == 'false' ]]; then
         "$API_URL"
     )
 
-    status=$(echo "$JSON_RESPONSE" | jq -r '.data.attributes.status')
+    status=$(echo "$JSON_RESPONSE" | jq -r '.data[0].attributes.status')
 
     if [[ "$status" == "failed" ]]; then
       echo "Site installation failed"
@@ -545,7 +547,7 @@ if [[ $RA_FOUND == 'false' ]]; then
     exit 1
   fi
 
-  echo "$JSON_RESPONSE" | jq '.data' > site.json
+  echo "$JSON_RESPONSE" | jq '.data[0]' > site.json
 fi
 
 if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then

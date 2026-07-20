@@ -9,7 +9,7 @@ load 'helpers'
 setup_alias_mocks() {
   local host="$1"
 
-  mock_curl_response \
+  mock_curl_response_sequence \
     "GET" \
     "https://forge.laravel.com/api/orgs/test-org/servers/123/sites?filter%5Bname%5D=$host" \
     "get_sites_without_existing_site.json"
@@ -20,11 +20,12 @@ setup_alias_mocks() {
     "post_create_site.json" \
     "202"
 
-  mock_curl_response \
+  # Poll after creation, same URL as the existence check above (GET /sites/{id}
+  # isn't supported by the Forge API v2) - site now found and installed.
+  mock_curl_response_sequence \
     "GET" \
-    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1" \
-    "get_site_status_installed.json" \
-    "200"
+    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites?filter%5Bname%5D=$host" \
+    "get_sites_with_existing_site.json"
 
   mock_curl_response \
     "GET" \

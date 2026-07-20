@@ -125,6 +125,8 @@ set -e
 FIXTURES_DIR="$BATS_TEST_DIRNAME/fixtures"
 MOCK_RESPONSES_FILE="$BATS_TEST_DIRNAME/.curl_mock_responses"
 MOCK_STATUS_CODES_FILE="$BATS_TEST_DIRNAME/.curl_status_codes"
+MOCK_SEQUENCE_RESPONSES_FILE="$BATS_TEST_DIRNAME/.curl_mock_sequence_responses"
+MOCK_SEQUENCE_STATUS_CODES_FILE="$BATS_TEST_DIRNAME/.curl_mock_sequence_status_codes"
 
 # Parse arguments to find method, URL, and output file
 method="GET"
@@ -170,28 +172,72 @@ fi
 
 response_key="\${method}|\${url}"
 
-# Find the mock response file (last matching registration wins, so a test
-# can override a response registered earlier by a shared setup helper)
-mock_response_file=""
-if [[ -f "\$MOCK_RESPONSES_FILE" ]]; then
+# Sequence mocks (registered via mock_curl_response_sequence) serve one
+# response per call to the same key, in order, then keep repeating the last
+# one - this lets a test simulate a poll loop (e.g. "not found" on the first
+# call to a URL, "installed" on the next call to that same URL). Checked
+# first; if none are registered for this key, fall back to the regular
+# single-value mock below (last registration wins, unaffected by call count).
+sequence_responses=()
+if [[ -f "\$MOCK_SEQUENCE_RESPONSES_FILE" ]]; then
     while IFS= read -r line; do
         if [[ "\$line" == "\${response_key}="* ]]; then
-            mock_response_file="\${line#"\${response_key}="}"
+            sequence_responses+=("\${line#"\${response_key}="}")
         fi
-    done < "\$MOCK_RESPONSES_FILE"
-    # If it's not an absolute path, assume it's relative to fixtures dir
+    done < "\$MOCK_SEQUENCE_RESPONSES_FILE"
+fi
+
+mock_response_file=""
+
+if [[ \${#sequence_responses[@]} -gt 0 ]]; then
+    sequence_status_codes=()
+    if [[ -f "\$MOCK_SEQUENCE_STATUS_CODES_FILE" ]]; then
+        while IFS= read -r line; do
+            if [[ "\$line" == "\${response_key}="* ]]; then
+                sequence_status_codes+=("\${line#"\${response_key}="}")
+            fi
+        done < "\$MOCK_SEQUENCE_STATUS_CODES_FILE"
+    fi
+
+    call_count_file="\$BATS_TEST_TMPDIR/.curl_call_count_\$(echo -n "\$response_key" | cksum | cut -d' ' -f1)"
+    call_index=0
+    [[ -f "\$call_count_file" ]] && call_index="\$(cat "\$call_count_file")"
+    [[ "\$call_index" -ge \${#sequence_responses[@]} ]] && call_index=\$((\${#sequence_responses[@]} - 1))
+
+    mock_response_file="\${sequence_responses[\$call_index]}"
     if [[ -n "\$mock_response_file" && "\$mock_response_file" != /* ]]; then
         mock_response_file="\$FIXTURES_DIR/\$mock_response_file"
     fi
-fi
 
-# Find the status code for this request (last matching registration wins)
-if [[ -f "\$MOCK_STATUS_CODES_FILE" ]]; then
-    while IFS= read -r line; do
-        if [[ "\$line" == "\${response_key}="* ]]; then
-            status_code="\${line#"\${response_key}="}"
+    if [[ \${#sequence_status_codes[@]} -gt 0 ]]; then
+        status_index="\$call_index"
+        [[ "\$status_index" -ge \${#sequence_status_codes[@]} ]] && status_index=\$((\${#sequence_status_codes[@]} - 1))
+        status_code="\${sequence_status_codes[\$status_index]}"
+    fi
+
+    echo "\$((call_index + 1))" > "\$call_count_file"
+else
+    # Find the mock response file (last matching registration wins, so a test
+    # can override a response registered earlier by a shared setup helper)
+    if [[ -f "\$MOCK_RESPONSES_FILE" ]]; then
+        while IFS= read -r line; do
+            if [[ "\$line" == "\${response_key}="* ]]; then
+                mock_response_file="\${line#"\${response_key}="}"
+            fi
+        done < "\$MOCK_RESPONSES_FILE"
+        if [[ -n "\$mock_response_file" && "\$mock_response_file" != /* ]]; then
+            mock_response_file="\$FIXTURES_DIR/\$mock_response_file"
         fi
-    done < "\$MOCK_STATUS_CODES_FILE"
+    fi
+
+    # Find the status code for this request (last matching registration wins)
+    if [[ -f "\$MOCK_STATUS_CODES_FILE" ]]; then
+        while IFS= read -r line; do
+            if [[ "\$line" == "\${response_key}="* ]]; then
+                status_code="\${line#"\${response_key}="}"
+            fi
+        done < "\$MOCK_STATUS_CODES_FILE"
+    fi
 fi
 
 # Check if mock response file exists
@@ -226,7 +272,8 @@ EOF
     export PATH="$MOCK_DIR:$PATH"
 
     # Clean up any existing response files
-    rm -f "$BATS_TEST_DIRNAME/.curl_mock_responses" "$BATS_TEST_DIRNAME/.curl_status_codes"
+    rm -f "$BATS_TEST_DIRNAME/.curl_mock_responses" "$BATS_TEST_DIRNAME/.curl_status_codes" \
+        "$BATS_TEST_DIRNAME/.curl_mock_sequence_responses" "$BATS_TEST_DIRNAME/.curl_mock_sequence_status_codes"
 }
 
 # Mock response with status code
@@ -238,6 +285,21 @@ mock_curl_response() {
 
     echo "${method}|${url}=${response_file}" >> "$BATS_TEST_DIRNAME/.curl_mock_responses"
     echo "${method}|${url}=${status_code}" >> "$BATS_TEST_DIRNAME/.curl_status_codes"
+}
+
+# Register a response served only on the Nth call to this method+URL, then
+# repeated for any further call - use for polling loops where the same URL is
+# hit multiple times expecting different responses (e.g. "not found" then
+# "installed"). Unlike mock_curl_response, repeated registrations for the same
+# key do NOT override each other - they queue up in call order.
+mock_curl_response_sequence() {
+    local method="$1"
+    local url="$2"
+    local response_file="$3"
+    local status_code="${4:-200}"
+
+    echo "${method}|${url}=${response_file}" >> "$BATS_TEST_DIRNAME/.curl_mock_sequence_responses"
+    echo "${method}|${url}=${status_code}" >> "$BATS_TEST_DIRNAME/.curl_mock_sequence_status_codes"
 }
 
 # Mock default response (optional)
@@ -252,7 +314,8 @@ teardown_curl_mock() {
     if [[ -n "$MOCK_DIR" && -d "$MOCK_DIR" ]]; then
         rm -rf "$MOCK_DIR"
     fi
-    rm -f "$BATS_TEST_DIRNAME/.curl_mock_responses" "$BATS_TEST_DIRNAME/.curl_status_codes"
+    rm -f "$BATS_TEST_DIRNAME/.curl_mock_responses" "$BATS_TEST_DIRNAME/.curl_status_codes" \
+        "$BATS_TEST_DIRNAME/.curl_mock_sequence_responses" "$BATS_TEST_DIRNAME/.curl_mock_sequence_status_codes"
     unset MOCK_DIR
 }
 

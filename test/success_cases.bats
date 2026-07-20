@@ -21,10 +21,17 @@ setup_successful_common_curl_mocks() {
   local existing_site="${1:-false}"
 
   if [[ $existing_site == "false" ]]; then
-    mock_curl_response \
+    # First call (existence check before creation): no site yet. Second call
+    # (poll after creation, same URL - GET /sites/{id} isn't supported by the
+    # Forge API v2): site now found and installed.
+    mock_curl_response_sequence \
       "GET" \
       "https://forge.laravel.com/api/orgs/test-org/servers/123/sites?filter%5Bname%5D=1-test-branch" \
       "get_sites_without_existing_site.json"
+    mock_curl_response_sequence \
+      "GET" \
+      "https://forge.laravel.com/api/orgs/test-org/servers/123/sites?filter%5Bname%5D=1-test-branch" \
+      "get_sites_with_existing_site.json"
   else
     mock_curl_response \
       "GET" \
@@ -54,12 +61,6 @@ setup_successful_common_curl_mocks() {
     "https://forge.laravel.com/api/orgs/test-org/servers/123/sites" \
     "post_create_site.json" \
     "202"
-
-  mock_curl_response \
-    "GET" \
-    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1" \
-    "get_site_status_installed.json" \
-    "200"
 
   mock_curl_response \
     "POST" \
