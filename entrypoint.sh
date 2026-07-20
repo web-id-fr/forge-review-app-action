@@ -707,7 +707,11 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     JSON_PAYLOAD='{
       "enable": true,
-      "type": "letsencrypt"
+      "type": "letsencrypt",
+      "letsencrypt": {
+        "verification_method": "http-01",
+        "key_type": "rsa"
+      }
     }'
 
     if [[ $DEBUG == 'true' ]]; then
