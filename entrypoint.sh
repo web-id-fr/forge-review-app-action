@@ -78,8 +78,7 @@ if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
 fi
 
 # Process aliases if provided
-ALL_DOMAINS="$INPUT_HOST"
-ALIASES_JSON_ARRAY=""
+ALIASES_ARRAY=()
 if [[ -n "$INPUT_ALIASES" ]]; then
   echo ""
   echo "* Processing aliases: $INPUT_ALIASES"
@@ -88,7 +87,6 @@ if [[ -n "$INPUT_ALIASES" ]]; then
   IFS=',' read -ra ALIASES << EOF
 $INPUT_ALIASES
 EOF
-  ALIAS_DOMAINS=""
 
   for alias in "${ALIASES[@]}"; do
     # Trim whitespace from alias
@@ -116,29 +114,11 @@ EOF
         ALIAS_DOMAIN="$alias-$INPUT_HOST"
       fi
 
-      if [[ -n "$ALIAS_DOMAINS" ]]; then
-        ALIAS_DOMAINS="$ALIAS_DOMAINS,$ALIAS_DOMAIN"
-      else
-        ALIAS_DOMAINS="$ALIAS_DOMAIN"
-      fi
-
-      # Build JSON array for aliases
-      if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-        ALIASES_JSON_ARRAY="$ALIASES_JSON_ARRAY, \"$ALIAS_DOMAIN\""
-      else
-        ALIASES_JSON_ARRAY="\"$ALIAS_DOMAIN\""
-      fi
+      ALIASES_ARRAY+=("$ALIAS_DOMAIN")
 
       echo "  - Created alias: $ALIAS_DOMAIN"
     fi
   done
-
-  # Combine main host with alias domains for certificate
-  if [[ -n "$ALIAS_DOMAINS" ]]; then
-    ALL_DOMAINS="$INPUT_HOST,$ALIAS_DOMAINS"
-  fi
-
-  echo "All domains for certificate: $ALL_DOMAINS"
 fi
 
 if [[ -z "$INPUT_REPOSITORY" ]]; then
@@ -162,9 +142,18 @@ if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
 fi
 
 AUTH_HEADER="Authorization: Bearer $INPUT_FORGE_API_TOKEN"
+ACCEPT_HEADER="Accept: application/vnd.api+json"
+CONTENT_TYPE_HEADER="Content-Type: application/json"
+
+API_BASE="https://forge.laravel.com/api/orgs/$INPUT_FORGE_ORGANIZATION/servers/$INPUT_FORGE_SERVER_ID"
 
 if [[ -z "$INPUT_PROJECT_TYPE" ]]; then
   INPUT_PROJECT_TYPE='php'
+fi
+
+# 'html' was a valid site type in the Forge API v1, renamed to 'static-html' in v2.
+if [[ "$INPUT_PROJECT_TYPE" == 'html' ]]; then
+  INPUT_PROJECT_TYPE='static-html'
 fi
 
 if [[ -z "$INPUT_DIRECTORY" ]]; then
@@ -247,14 +236,6 @@ if [[ -z "$INPUT_WORKER_STOPWAITSECS" ]]; then
   INPUT_WORKER_STOPWAITSECS='600'
 fi
 
-if [[ -z "$INPUT_WORKER_PHP_VERSION" ]]; then
-  INPUT_WORKER_PHP_VERSION=$INPUT_PHP_VERSION
-fi
-
-if [[ -z "$INPUT_WORKER_DAEMON" ]]; then
-  INPUT_WORKER_DAEMON='true'
-fi
-
 if [[ -z "$INPUT_WORKER_FORCE" ]]; then
   INPUT_WORKER_FORCE='false'
 fi
@@ -269,6 +250,10 @@ fi
 
 if [[ -z "$INPUT_QUICK_DEPLOY_ENABLED" ]]; then
   INPUT_QUICK_DEPLOY_ENABLED='false'
+fi
+
+if [[ -n "$INPUT_WORKER_DAEMON" || -n "$INPUT_WORKER_PHP_VERSION" ]]; then
+  echo "⚠️ 'worker_daemon' and 'worker_php_version' have no equivalent in the Forge API v2 (Background Processes are always supervisor-managed and always use the server's default CLI PHP version). These inputs are ignored."
 fi
 
 echo ""
@@ -288,7 +273,7 @@ echo ".env and deploy script stub files found"
 
 echo ""
 echo '* Get Forge server sites'
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
+API_URL="$API_BASE/sites?filter%5Bname%5D=$INPUT_HOST"
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] CURL GET on $API_URL"
@@ -297,7 +282,7 @@ fi
 
 JSON_RESPONSE=$(
   curl -s -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
+    -H "$ACCEPT_HEADER" \
     "$API_URL"
 )
 
@@ -309,8 +294,8 @@ if [[ $DEBUG == 'true' ]]; then
   echo ""
 fi
 
-# Check if review-app site exists
-SITE_DATA=$(jq -r '.sites[] | select(.name == "'"$INPUT_HOST"'") // empty' sites.json)
+# Check if review-app site exists (filter[name] may be a partial match, so confirm the exact name)
+SITE_DATA=$(jq -r '.data[] | select(.attributes.name == "'"$INPUT_HOST"'") // empty' sites.json)
 if [[ -n "$SITE_DATA" ]]; then
   echo "$SITE_DATA" > site.json
   SITE_ID=$(jq -r '.id' site.json)
@@ -327,36 +312,156 @@ else
 fi
 
 if [[ $RA_FOUND == 'false' ]]; then
+  DATABASE_ID=""
+
+  if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
+    echo ""
+    echo "* Get Forge server databases"
+
+    API_URL="$API_BASE/database/schemas?filter%5Bname%5D=$INPUT_DATABASE_NAME"
+
+    JSON_RESPONSE=$(
+      curl -s -H "$AUTH_HEADER" \
+        -H "$ACCEPT_HEADER" \
+        "$API_URL"
+    )
+    echo "$JSON_RESPONSE" > databases.json
+
+    DATABASE_DATA=$(jq -r '.data[] | select(.attributes.name == "'"$INPUT_DATABASE_NAME"'") // empty' databases.json)
+
+    if [[ -n "$DATABASE_DATA" ]]; then
+      echo "$DATABASE_DATA" > database.json
+      DATABASE_ID=$(jq -r '.id' database.json)
+      echo "A database (ID $DATABASE_ID, NAME $INPUT_DATABASE_NAME) already exists"
+    else
+      echo ""
+      echo "* Create review-app database"
+
+      API_URL="$API_BASE/database/schemas"
+
+      JSON_PAYLOAD='{
+        "name": "'"$INPUT_DATABASE_NAME"'"
+      }'
+
+      if [[ $DEBUG == 'true' ]]; then
+        echo "[DEBUG] CURL POST on $API_URL with payload :"
+        echo "$JSON_PAYLOAD"
+        echo ""
+      fi
+
+      HTTP_STATUS=$(
+        curl -s -o create-database-response.json -w "%{http_code}" \
+          -X POST \
+          -H "$AUTH_HEADER" \
+          -H "$ACCEPT_HEADER" \
+          -H "$CONTENT_TYPE_HEADER" \
+          -d "$JSON_PAYLOAD" \
+          "$API_URL"
+      )
+
+      JSON_RESPONSE=$(cat create-database-response.json)
+
+      if [[ $HTTP_STATUS -eq 202 ]]; then
+        jq '.data' create-database-response.json > database.json
+        DATABASE_ID=$(jq -r '.id' database.json)
+        echo "New database (ID $DATABASE_ID) created successfully"
+      else
+        echo "Failed to create new database. HTTP status code: $HTTP_STATUS"
+        echo "JSON Response:"
+        echo "$JSON_RESPONSE"
+        exit 1
+      fi
+
+      echo ""
+      echo "* Wait for database to be installed"
+
+      API_URL="$API_BASE/database/schemas/$DATABASE_ID"
+
+      start_time=$(date +%s)
+      elapsed_time=0
+      status=""
+
+      while [[ "$status" != "installed" && "$elapsed_time" -lt 120 ]]; do
+        JSON_RESPONSE=$(
+          curl -s -H "$AUTH_HEADER" \
+            -H "$ACCEPT_HEADER" \
+            "$API_URL"
+        )
+
+        status=$(echo "$JSON_RESPONSE" | jq -r '.data.attributes.status')
+
+        if [[ "$status" != "installed" ]]; then
+          echo "Database status is not \"installed\" ($status), retrying in 5 seconds..."
+          sleep 5
+        fi
+
+        current_time=$(date +%s)
+        elapsed_time=$((current_time - start_time))
+      done
+
+      if [[ "$status" != "installed" ]]; then
+        echo "Timeout reached while waiting for database installation, exiting."
+        exit 1
+      fi
+    fi
+  fi
+
   echo ""
   echo "* Create review-app site"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites"
+  API_URL="$API_BASE/sites"
 
-  # Build JSON payload incrementally
-  # Start with base properties (always present)
   JSON_PAYLOAD='{
-    "domain": "'"$INPUT_HOST"'",
-    "project_type": "'"$INPUT_PROJECT_TYPE"'",
-    "directory": "'"$INPUT_DIRECTORY"'",
-    "isolated": '"$INPUT_ISOLATED"',
-    "php_version": "'"$INPUT_PHP_VERSION"'"'
+    "type": "'"$INPUT_PROJECT_TYPE"'",
+    "domain_mode": "custom",
+    "name": "'"$INPUT_HOST"'",
+    "web_directory": "'"$INPUT_DIRECTORY"'",
+    "is_isolated": '"$INPUT_ISOLATED"',
+    "php_version": "'"$INPUT_PHP_VERSION"'",
+    "push_to_deploy": '"$INPUT_QUICK_DEPLOY_ENABLED"',
+    "www_redirect_type": "none",
+    "allow_wildcard_subdomains": false'
 
-  # Add database if requested
-  if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
+  if [[ -n "$DATABASE_ID" ]]; then
     JSON_PAYLOAD="$JSON_PAYLOAD"',
-    "database": "'"$INPUT_DATABASE_NAME"'"'
+    "database_id": '"$DATABASE_ID"''
   fi
 
-  # Add nginx_template if provided
+  if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
+    JSON_PAYLOAD="$JSON_PAYLOAD"',
+    "source_control_provider": "'"$INPUT_REPOSITORY_PROVIDER"'",
+    "repository": "'"$INPUT_REPOSITORY"'",
+    "branch": "'"$INPUT_BRANCH"'",
+    "install_composer_dependencies": '"$INPUT_COMPOSER"''
+  fi
+
   if [[ -n "$INPUT_NGINX_TEMPLATE" ]]; then
-    JSON_PAYLOAD="$JSON_PAYLOAD"',
-    "nginx_template": "'"$INPUT_NGINX_TEMPLATE"'"'
-  fi
+    if [[ "$INPUT_NGINX_TEMPLATE" =~ ^[0-9]+$ ]]; then
+      # Numeric input: use it directly as the nginx template ID (backward-compatible
+      # with existing consumers passing the raw ID, as the pre-v2 API did).
+      NGINX_TEMPLATE_ID="$INPUT_NGINX_TEMPLATE"
+    else
+      echo ""
+      echo "* Resolve nginx template ID for '$INPUT_NGINX_TEMPLATE'"
 
-  # Add aliases if configured
-  if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
+      NGINX_TEMPLATE_URL="$API_BASE/nginx/templates?filter%5Bname%5D=$INPUT_NGINX_TEMPLATE"
+
+      NGINX_TEMPLATE_RESPONSE=$(
+        curl -s -H "$AUTH_HEADER" \
+          -H "$ACCEPT_HEADER" \
+          "$NGINX_TEMPLATE_URL"
+      )
+
+      NGINX_TEMPLATE_ID=$(echo "$NGINX_TEMPLATE_RESPONSE" | jq -r '.data[] | select(.attributes.name == "'"$INPUT_NGINX_TEMPLATE"'") | .id' | head -n 1)
+
+      if [[ -z "$NGINX_TEMPLATE_ID" ]]; then
+        echo "Error: nginx template '$INPUT_NGINX_TEMPLATE' not found"
+        exit 1
+      fi
+    fi
+
     JSON_PAYLOAD="$JSON_PAYLOAD"',
-    "aliases": ['"$ALIASES_JSON_ARRAY"']'
+    "nginx_template_id": '"$NGINX_TEMPLATE_ID"''
   fi
 
   # Close JSON object
@@ -373,8 +478,8 @@ if [[ $RA_FOUND == 'false' ]]; then
     curl -s -o site-create-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
+      -H "$ACCEPT_HEADER" \
+      -H "$CONTENT_TYPE_HEADER" \
       -d "$JSON_PAYLOAD" \
       "$API_URL"
   )
@@ -387,15 +492,15 @@ if [[ $RA_FOUND == 'false' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 ]]; then
-    jq '.site' site-create-response.json > site.json
+  if [[ $HTTP_STATUS -eq 202 ]]; then
+    jq '.data' site-create-response.json > site.json
     SITE_ID=$(jq -r '.id' site.json)
 
     if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
       echo "site_id=$SITE_ID" >> $GITHUB_OUTPUT
     fi
 
-    if [[ $INPUT_CREATE_DATABASE == 'true' ]]; then
+    if [[ -n "$DATABASE_ID" ]]; then
       echo "New site (ID $SITE_ID) and database created successfully"
     else
       echo "New site (ID $SITE_ID) created successfully"
@@ -406,62 +511,90 @@ if [[ $RA_FOUND == 'false' ]]; then
     echo "$JSON_RESPONSE"
     exit 1
   fi
+
+  echo ""
+  echo "* Wait for site to be installed"
+
+  # GET /sites/{id} is not supported by the Forge API v2 (only PUT/DELETE), so
+  # the site must be looked up by name instead.
+  API_URL="$API_BASE/sites?filter%5Bname%5D=$INPUT_HOST"
+
+  start_time=$(date +%s)
+  elapsed_time=0
+  status=""
+
+  while [[ "$status" != "installed" && "$status" != "never-deployed" && "$elapsed_time" -lt 120 ]]; do
+    JSON_RESPONSE=$(
+      curl -s -H "$AUTH_HEADER" \
+        -H "$ACCEPT_HEADER" \
+        "$API_URL"
+    )
+
+    status=$(echo "$JSON_RESPONSE" | jq -r '.data[0].attributes.status')
+
+    if [[ "$status" == "failed" ]]; then
+      echo "Site installation failed"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
+
+    if [[ "$status" != "installed" && "$status" != "never-deployed" ]]; then
+      echo "Site status is not ready yet ($status), retrying in 5 seconds..."
+      sleep 5
+    fi
+
+    current_time=$(date +%s)
+    elapsed_time=$((current_time - start_time))
+  done
+
+  if [[ "$status" != "installed" && "$status" != "never-deployed" ]]; then
+    echo "Timeout reached while waiting for site installation, exiting."
+    exit 1
+  fi
+
+  echo "$JSON_RESPONSE" | jq '.data[0]' > site.json
 fi
 
 if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
   echo ""
   echo "* Check if repository is configured"
-  SITE_REPOSITORY=$(jq -r '.repository' site.json)
+  SITE_REPOSITORY_URL=$(jq -r '.attributes.repository.url' site.json)
 
-  if [[ $SITE_REPOSITORY == 'null' ]]; then
-    echo "Repository not configured on Forge site"
-    REPOSITORY_CONFIGURED='false'
+  if [[ $SITE_REPOSITORY_URL == 'null' ]]; then
+    echo "⚠️ Repository is not configured on this Forge site, and the Forge API v2 has no endpoint to configure a repository on an already existing site (it can only be set at site creation). Skipping."
   else
-    echo "Repository configured on Forge site ($SITE_REPOSITORY)"
-    REPOSITORY_CONFIGURED='true'
+    echo "Repository configured on Forge site ($SITE_REPOSITORY_URL)"
   fi
+fi
 
-  if [[ $REPOSITORY_CONFIGURED == 'false' ]]; then
+if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
+  CURRENT_QUICK_DEPLOY=$(jq -r '.attributes.quick_deploy' site.json)
+
+  if [[ "$CURRENT_QUICK_DEPLOY" != "true" ]]; then
     echo ""
-    echo "* Setup git repository on site"
+    echo "* Enable quick deployment"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/git"
-
-    JSON_PAYLOAD='{
-      "provider": "'"$INPUT_REPOSITORY_PROVIDER"'",
-      "repository": "'"$INPUT_REPOSITORY"'",
-      "branch": "'"$INPUT_BRANCH"'",
-      "composer": '"$INPUT_COMPOSER"'
-    }'
+    API_URL="$API_BASE/sites/$SITE_ID/deployments/push-to-deploy"
 
     if [[ $DEBUG == 'true' ]]; then
-        echo "[DEBUG] CURL POST on $API_URL with payload :"
-        echo "$JSON_PAYLOAD"
-        echo ""
-      fi
-
-    HTTP_STATUS=$(
-      curl -s -o setup-git-response.json -w "%{http_code}" \
-        -X POST \
-        -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
-        -d "$JSON_PAYLOAD" \
-        "$API_URL"
-    )
-
-    JSON_RESPONSE=$(cat setup-git-response.json)
-
-    if [[ $DEBUG == 'true' ]]; then
-      echo "[DEBUG] response JSON:"
-      echo "$JSON_RESPONSE"
+      echo "[DEBUG] CURL POST on $API_URL"
       echo ""
     fi
 
-    if [[ $HTTP_STATUS -eq 200 ]]; then
-      echo "Git repository configured successfully"
+    HTTP_STATUS=$(
+      curl -s -o setup-site-quick-deploy-response.json -w "%{http_code}" \
+        -X POST \
+        -H "$AUTH_HEADER" \
+        -H "$ACCEPT_HEADER" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat setup-site-quick-deploy-response.json)
+
+    if [[ $HTTP_STATUS -eq 202 ]]; then
+      echo "Enabled quick deployment successfully"
     else
-      echo "Failed to setup git repository on Forge site. HTTP status code: $HTTP_STATUS"
+      echo "Failed to enable quick deployment. HTTP status code: $HTTP_STATUS"
       echo "JSON Response:"
       echo "$JSON_RESPONSE"
       exit 1
@@ -469,63 +602,42 @@ if [[ $INPUT_CONFIGURE_REPOSITORY == 'true' ]]; then
   fi
 fi
 
-if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
-  echo ""
-  echo "* Check if site has a certificate"
+echo ""
+echo "* Get site domains"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates"
+API_URL="$API_BASE/sites/$SITE_ID/domains"
 
-  if [[ $DEBUG == 'true' ]]; then
-    echo "[DEBUG] CURL GET on $API_URL"
-    echo ""
-  fi
-
-  HTTP_STATUS=$(
-    curl -s -o site-certificates-response.json -w "%{http_code}" \
-    -X GET \
-    -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+JSON_RESPONSE=$(
+  curl -s -H "$AUTH_HEADER" \
+    -H "$ACCEPT_HEADER" \
     "$API_URL"
-  )
+)
+echo "$JSON_RESPONSE" > domains.json
 
-  if [[ $DEBUG == 'true' ]]; then
-    echo "[DEBUG] response JSON:"
-    cat site-certificates-response.json
-    echo ""
-  fi
+if [[ $DEBUG == 'true' ]]; then
+  echo "[DEBUG] response JSON:"
+  echo "$JSON_RESPONSE"
+  echo ""
+fi
 
-  if [[ $HTTP_STATUS -eq 200 ]]; then
-    echo "Fetched site certificates successfully"
-    if jq -e '.certificates | length > 0' site-certificates-response.json > /dev/null; then
-      echo "Site has at least one certificate"
-      CERTIFICATE_FOUND='true'
-    else
-      echo "Site has no certificate"
-      CERTIFICATE_FOUND='false'
-    fi
+DOMAIN_IDS=()
+DOMAIN_NAMES=("$INPUT_HOST" "${ALIASES_ARRAY[@]}")
+
+for domain_name in "${DOMAIN_NAMES[@]}"; do
+  DOMAIN_ID=$(jq -r '.data[] | select(.attributes.name == "'"$domain_name"'") | .id // empty' domains.json)
+
+  if [[ -n "$DOMAIN_ID" ]]; then
+    echo "Domain '$domain_name' already exists (ID $DOMAIN_ID)"
   else
-    echo "Failed to fetch site certificates. HTTP status code: $HTTP_STATUS"
-    echo "JSON Response:"
-    cat site-certificates-response.json
-    exit 1
-  fi
-
-  if [[ $CERTIFICATE_FOUND == 'false' ]]; then
     echo ""
-    echo "* Obtain Let's Encrypt certificate"
+    echo "* Create domain '$domain_name'"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/letsencrypt"
-
-    # Build domains JSON array by combining main host with aliases
-    if [[ -n "$ALIASES_JSON_ARRAY" ]]; then
-      DOMAINS_JSON_ARRAY="\"$INPUT_HOST\", $ALIASES_JSON_ARRAY"
-    else
-      DOMAINS_JSON_ARRAY="\"$INPUT_HOST\""
-    fi
+    API_URL="$API_BASE/sites/$SITE_ID/domains"
 
     JSON_PAYLOAD='{
-      "domains": ['"$DOMAINS_JSON_ARRAY"']
+      "name": "'"$domain_name"'",
+      "allow_wildcard_subdomains": false,
+      "www_redirect_type": "none"
     }'
 
     if [[ $DEBUG == 'true' ]]; then
@@ -535,16 +647,52 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     fi
 
     HTTP_STATUS=$(
-      curl -s -o site-letsencrypt-response.json -w "%{http_code}" \
+      curl -s -o create-domain-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
+        -H "$ACCEPT_HEADER" \
+        -H "$CONTENT_TYPE_HEADER" \
         -d "$JSON_PAYLOAD" \
         "$API_URL"
     )
 
-    JSON_RESPONSE=$(cat site-letsencrypt-response.json)
+    JSON_RESPONSE=$(cat create-domain-response.json)
+
+    if [[ $HTTP_STATUS -eq 202 ]]; then
+      DOMAIN_ID=$(jq -r '.data.id' create-domain-response.json)
+      echo "Domain '$domain_name' created successfully (ID $DOMAIN_ID)"
+    else
+      echo "Failed to create domain '$domain_name'. HTTP status code: $HTTP_STATUS"
+      echo "JSON Response:"
+      echo "$JSON_RESPONSE"
+      exit 1
+    fi
+  fi
+
+  DOMAIN_IDS+=("$DOMAIN_ID")
+done
+
+if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
+  for i in "${!DOMAIN_NAMES[@]}"; do
+    domain_name="${DOMAIN_NAMES[$i]}"
+    domain_id="${DOMAIN_IDS[$i]}"
+
+    echo ""
+    echo "* Check if domain '$domain_name' has a certificate"
+
+    API_URL="$API_BASE/sites/$SITE_ID/domains/$domain_id/certificates"
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL GET on $API_URL"
+      echo ""
+    fi
+
+    JSON_RESPONSE=$(
+      curl -s -H "$AUTH_HEADER" \
+        -H "$ACCEPT_HEADER" \
+        "$API_URL"
+    )
+    echo "$JSON_RESPONSE" > "domain-$domain_id-certificates.json"
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] response JSON:"
@@ -552,11 +700,48 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
       echo ""
     fi
 
-    if [[ $HTTP_STATUS -eq 200 ]]; then
-      echo "Request for a let's encrypt certificate sent successfully"
-      jq -r '.certificate' site-letsencrypt-response.json > certificate.json
+    if jq -e '.data | length > 0' "domain-$domain_id-certificates.json" > /dev/null; then
+      echo "Domain '$domain_name' already has at least one certificate"
+      continue
+    fi
+
+    echo ""
+    echo "* Obtain Let's Encrypt certificate for '$domain_name'"
+
+    API_URL="$API_BASE/sites/$SITE_ID/domains/$domain_id/certificates"
+
+    JSON_PAYLOAD='{
+      "enable": true,
+      "type": "letsencrypt",
+      "letsencrypt": {
+        "verification_method": "http-01",
+        "key_type": "rsa"
+      }
+    }'
+
+    if [[ $DEBUG == 'true' ]]; then
+      echo "[DEBUG] CURL POST on $API_URL with payload :"
+      echo "$JSON_PAYLOAD"
+      echo ""
+    fi
+
+    HTTP_STATUS=$(
+      curl -s -o "domain-$domain_id-certificate-create-response.json" -w "%{http_code}" \
+        -X POST \
+        -H "$AUTH_HEADER" \
+        -H "$ACCEPT_HEADER" \
+        -H "$CONTENT_TYPE_HEADER" \
+        -d "$JSON_PAYLOAD" \
+        "$API_URL"
+    )
+
+    JSON_RESPONSE=$(cat "domain-$domain_id-certificate-create-response.json")
+
+    if [[ $HTTP_STATUS -eq 202 ]]; then
+      CERTIFICATE_ID=$(jq -r '.data.id' "domain-$domain_id-certificate-create-response.json")
+      echo "Request for a Let's Encrypt certificate sent successfully (ID $CERTIFICATE_ID)"
     else
-      echo "Failed to request let's encrypt certificate. HTTP status code: $HTTP_STATUS"
+      echo "Failed to request Let's Encrypt certificate for '$domain_name'. HTTP status code: $HTTP_STATUS"
       echo "JSON Response:"
       echo "$JSON_RESPONSE"
       exit 1
@@ -565,10 +750,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     echo ""
     echo "* Wait for certificate to be installed"
 
-    CERTIFICATE_DATA=$(cat certificate.json)
-    CERTIFICATE_ID=$(echo "$CERTIFICATE_DATA" | jq -r '.id')
-
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/certificates/$CERTIFICATE_ID"
+    API_URL="$API_BASE/sites/$SITE_ID/domains/$domain_id/certificates/$CERTIFICATE_ID"
 
     start_time=$(date +%s)
     elapsed_time=0
@@ -576,20 +758,18 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
 
     while [[ "$status" != "installed" && "$elapsed_time" -lt $INPUT_CERTIFICATE_SETUP_TIMEOUT ]]; do
       if [[ $DEBUG == 'true' ]]; then
-        echo "[DEBUG] CURL GET on $API_URL "
+        echo "[DEBUG] CURL GET on $API_URL"
         echo ""
       fi
 
       HTTP_STATUS=$(
-        curl -s -o sites-certificates-response.json -w "%{http_code}" \
-        -X GET \
+        curl -s -o certificate-status-response.json -w "%{http_code}" \
         -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
+        -H "$ACCEPT_HEADER" \
         "$API_URL"
       )
 
-      JSON_RESPONSE=$(cat sites-certificates-response.json)
+      JSON_RESPONSE=$(cat certificate-status-response.json)
 
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] response JSON:"
@@ -605,7 +785,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
         continue
       fi
 
-      status=$(echo "$JSON_RESPONSE" | jq -r '.certificate."status"')
+      status=$(echo "$JSON_RESPONSE" | jq -r '.data.attributes.status')
 
       if [[ "$status" != "installed" ]]; then
         echo "Status is not \"installed\" ($status), retrying in 5 seconds..."
@@ -622,7 +802,7 @@ if [[ $INPUT_LETSENCRYPT_CERTIFICATE == 'true' ]]; then
     else
       echo "Certificate installed successfully"
     fi
-  fi
+  done
 fi
 
 echo ""
@@ -657,14 +837,14 @@ if [[ $DEBUG == 'true' ]]; then
   echo ""
 fi
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/env"
+API_URL="$API_BASE/sites/$SITE_ID/environment"
 
 JSON_PAYLOAD='{
-  "content": '"$ESCAPED_ENV_CONTENT"'
+  "environment": '"$ESCAPED_ENV_CONTENT"'
 }'
 
 if [[ $DEBUG == 'true' ]]; then
-  echo "[DEBUG] CURL POST on $API_URL with payload :"
+  echo "[DEBUG] CURL PUT on $API_URL with payload :"
   echo "$JSON_PAYLOAD"
   echo ""
 fi
@@ -673,8 +853,8 @@ HTTP_STATUS=$(
   curl -s -o update-site-env-response.json -w "%{http_code}" \
     -X PUT \
     -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+    -H "$ACCEPT_HEADER" \
+    -H "$CONTENT_TYPE_HEADER" \
     -d "$JSON_PAYLOAD" \
     "$API_URL"
 )
@@ -687,7 +867,7 @@ if [[ $DEBUG == 'true' ]]; then
   echo ""
 fi
 
-if [[ $HTTP_STATUS -eq 200 ]]; then
+if [[ $HTTP_STATUS -eq 202 ]]; then
   echo ".env file updated successfully"
 else
   echo "Failed to update .env file. HTTP status code: $HTTP_STATUS"
@@ -706,7 +886,7 @@ sed -i -e "s#STUB_HOST#$INPUT_HOST#" deploy-script
 DEPLOY_SCRIPT_CONTENT=$(cat deploy-script)
 ESCAPED_DEPLOY_SCRIPT_CONTENT=$(echo "$DEPLOY_SCRIPT_CONTENT" | jq -Rsa .)
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment/script"
+API_URL="$API_BASE/sites/$SITE_ID/deployments/script"
 
 JSON_PAYLOAD='{
   "content": '"$ESCAPED_DEPLOY_SCRIPT_CONTENT"',
@@ -714,7 +894,7 @@ JSON_PAYLOAD='{
 }'
 
 if [[ $DEBUG == 'true' ]]; then
-  echo "[DEBUG] CURL POST on $API_URL with payload :"
+  echo "[DEBUG] CURL PUT on $API_URL with payload :"
   echo "$JSON_PAYLOAD"
   echo ""
 fi
@@ -723,8 +903,8 @@ HTTP_STATUS=$(
   curl -s -o update-site-deployment-script-response.json -w "%{http_code}" \
     -X PUT \
     -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+    -H "$ACCEPT_HEADER" \
+    -H "$CONTENT_TYPE_HEADER" \
     -d "$JSON_PAYLOAD" \
     "$API_URL"
 )
@@ -740,7 +920,7 @@ fi
 if [[ $HTTP_STATUS -eq 200 ]]; then
   echo "Deployment script updated successfully"
 else
-  echo "Failed to update .env file. HTTP status code: $HTTP_STATUS"
+  echo "Failed to update deployment script. HTTP status code: $HTTP_STATUS"
   echo "JSON Response:"
   echo "$JSON_RESPONSE"
   exit 1
@@ -749,14 +929,13 @@ fi
 echo ""
 echo "* Launch deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment/deploy"
+API_URL="$API_BASE/sites/$SITE_ID/deployments"
 
 HTTP_STATUS=$(
   curl -s -o deploy-site-response.json -w "%{http_code}" \
     -X POST \
     -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+    -H "$ACCEPT_HEADER" \
     "$API_URL"
 )
 
@@ -773,7 +952,7 @@ if [[ $DEBUG == 'true' ]]; then
   echo ""
 fi
 
-if [[ $HTTP_STATUS -eq 200 ]]; then
+if [[ $HTTP_STATUS -eq 202 ]]; then
   echo "Deployment launched successfully"
 else
   echo "Failed to launch deployment. HTTP status code: $HTTP_STATUS"
@@ -785,13 +964,16 @@ fi
 echo ""
 echo "* Wait for deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID"
+# /deployments/status only reflects a deployment currently in progress and
+# reverts to null once it finishes (Forge API v2), so poll the deployments
+# list (most recent first) and check its status instead.
+API_URL="$API_BASE/sites/$SITE_ID/deployments?sort=-created_at&page%5Bsize%5D=1"
 
 start_time=$(date +%s)
 elapsed_time=0
 status=""
 
-while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]; do
+while [[ "$status" != "finished" && "$status" != "failed" && "$status" != "failed-build" && "$status" != "cancelled" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]; do
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL GET on $API_URL"
     echo ""
@@ -799,10 +981,8 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
 
   HTTP_STATUS=$(
     curl -s -o check-site-deployment-response.json -w "%{http_code}" \
-    -X GET \
     -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+    -H "$ACCEPT_HEADER" \
     "$API_URL"
   )
 
@@ -821,10 +1001,10 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
     exit 1
   fi
 
-  status=$(echo "$JSON_RESPONSE" | jq -r '.site."deployment_status"')
+  status=$(echo "$JSON_RESPONSE" | jq -r '.data[0].attributes.status')
 
-  if [[ "$status" != "null" ]]; then
-    echo "Status is not null ($status), retrying in 5 seconds..."
+  if [[ "$status" != "finished" && "$status" != "failed" && "$status" != "failed-build" && "$status" != "cancelled" ]]; then
+    echo "Status is $status, retrying in 5 seconds..."
     sleep 5
   fi
 
@@ -832,7 +1012,7 @@ while [[ "$status" != "null" && "$elapsed_time" -lt $INPUT_DEPLOYMENT_TIMEOUT ]]
   elapsed_time=$((current_time - start_time))
 done
 
-if [[ "$status" != "null" ]]; then
+if [[ "$status" != "finished" && "$status" != "failed" && "$status" != "failed-build" && "$status" != "cancelled" ]]; then
   echo "Timeout reached, exiting retry loop."
   exit 1
 fi
@@ -840,7 +1020,7 @@ fi
 echo ""
 echo "* Get last deployment"
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history"
+API_URL="$API_BASE/sites/$SITE_ID/deployments?sort=-created_at&page%5Bsize%5D=1"
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] CURL GET on $API_URL"
@@ -849,10 +1029,8 @@ fi
 
 HTTP_STATUS=$(
 curl -s -o last-deployment-response.json -w "%{http_code}" \
-  -X GET \
   -H "$AUTH_HEADER" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
+  -H "$ACCEPT_HEADER" \
   "$API_URL"
 )
 
@@ -863,10 +1041,10 @@ if [[ $DEBUG == 'true' ]]; then
 fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
-  echo "Fetched last deployment successfully "
-  jq -r '.deployments[0]' last-deployment-response.json > last-deployment.json
+  echo "Fetched last deployment successfully"
+  jq -r '.data[0]' last-deployment-response.json > last-deployment.json
 else
-  echo "Failed to launch deployment. HTTP status code: $HTTP_STATUS"
+  echo "Failed to fetch last deployment. HTTP status code: $HTTP_STATUS"
   echo "JSON Response:"
   cat last-deployment-response.json
   exit 1
@@ -876,9 +1054,9 @@ echo ""
 echo "* Get last deployment output"
 
 LAST_DEPLOYMENT_DATA=$(cat last-deployment.json)
-LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq '.id')
+LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq -r '.id')
 
-API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment-history/$LAST_DEPLOYMENT_ID/output"
+API_URL="$API_BASE/sites/$SITE_ID/deployments/$LAST_DEPLOYMENT_ID/log"
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] CURL GET on $API_URL"
@@ -886,15 +1064,13 @@ if [[ $DEBUG == 'true' ]]; then
 fi
 
 HTTP_STATUS=$(
-  curl -s -o deployment-history-output-response.json -w "%{http_code}" \
-    -X GET \
+  curl -s -o deployment-log-response.json -w "%{http_code}" \
     -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    -H "Content-Type: application/json" \
+    -H "$ACCEPT_HEADER" \
     "$API_URL"
 )
 
-JSON_RESPONSE=$(cat deployment-history-output-response.json)
+JSON_RESPONSE=$(cat deployment-log-response.json)
 
 if [[ $DEBUG == 'true' ]]; then
   echo "[DEBUG] response JSON:"
@@ -903,10 +1079,9 @@ if [[ $DEBUG == 'true' ]]; then
 fi
 
 if [[ $HTTP_STATUS -eq 200 ]]; then
-  echo "Fetched last deployment output successfully "
-  echo "$JSON_RESPONSE" > last-deployment-output-response.json
+  echo "Fetched last deployment output successfully"
 else
-  echo "Failed to launch deployment. HTTP status code: $HTTP_STATUS"
+  echo "Failed to fetch last deployment output. HTTP status code: $HTTP_STATUS"
   echo "JSON Response:"
   echo "$JSON_RESPONSE"
   exit 1
@@ -915,11 +1090,8 @@ fi
 echo ""
 echo "* Check last deployment"
 
-LAST_DEPLOYMENT_DATA=$(cat last-deployment.json)
-LAST_DEPLOYMENT_STATUS=$(echo "$LAST_DEPLOYMENT_DATA" | jq -r '.status')
-LAST_DEPLOYMENT_ID=$(echo "$LAST_DEPLOYMENT_DATA" | jq '.id')
-LAST_DEPLOYMENT_OUTPUT_DATA=$(cat last-deployment-output-response.json)
-LAST_DEPLOYMENT_OUTPUT=$(echo "$LAST_DEPLOYMENT_OUTPUT_DATA" | jq -r '.output')
+LAST_DEPLOYMENT_STATUS=$(echo "$LAST_DEPLOYMENT_DATA" | jq -r '.attributes.status')
+LAST_DEPLOYMENT_OUTPUT=$(cat deployment-log-response.json | jq -r '.data.attributes.output')
 
 if [[ $LAST_DEPLOYMENT_STATUS == 'finished' ]]; then
   echo "Deployment finished successfully"
@@ -940,7 +1112,7 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
   echo ""
   echo "* Enable Laravel Horizon integration"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/integrations/horizon"
+  API_URL="$API_BASE/sites/$SITE_ID/integrations/horizon"
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL POST on $API_URL"
@@ -951,8 +1123,7 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
     curl -s -o setup-site-horizon-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
+      -H "$ACCEPT_HEADER" \
       "$API_URL"
   )
 
@@ -964,7 +1135,7 @@ if [[ $INPUT_HORIZON_ENABLED == 'true' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
+  if [[ $HTTP_STATUS -eq 202 ]]; then
     echo "Laravel Horizon integration enabled successfully"
   else
     echo "Failed to enable Laravel Horizon integration. HTTP status code: $HTTP_STATUS"
@@ -978,7 +1149,7 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
   echo ""
   echo "* Enable Laravel Scheduler integration"
 
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/integrations/laravel-scheduler"
+  API_URL="$API_BASE/sites/$SITE_ID/integrations/laravel-scheduler"
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL POST on $API_URL"
@@ -989,8 +1160,7 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
     curl -s -o setup-site-scheduler-response.json -w "%{http_code}" \
       -X POST \
       -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
+      -H "$ACCEPT_HEADER" \
       "$API_URL"
   )
 
@@ -1002,7 +1172,7 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
     echo ""
   fi
 
-  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
+  if [[ $HTTP_STATUS -eq 202 ]]; then
     echo "Laravel Scheduler integration enabled successfully"
   else
     echo "Failed to enable Laravel Scheduler integration. HTTP status code: $HTTP_STATUS"
@@ -1012,48 +1182,10 @@ if [[ $INPUT_SCHEDULER_ENABLED == 'true' ]]; then
   fi
 fi
 
-if [[ $INPUT_QUICK_DEPLOY_ENABLED == 'true' ]]; then
-  echo ""
-  echo "* Enable quick deployment"
-
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/deployment"
-
-  if [[ $DEBUG == 'true' ]]; then
-    echo "[DEBUG] CURL POST on $API_URL"
-    echo ""
-  fi
-
-  HTTP_STATUS=$(
-    curl -s -o setup-site-quick-deploy-response.json -w "%{http_code}" \
-      -X POST \
-      -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      "$API_URL"
-  )
-
-  JSON_RESPONSE=$(cat setup-site-quick-deploy-response.json)
-
-  if [[ $DEBUG == 'true' ]]; then
-    echo "[DEBUG] response JSON:"
-    echo "$JSON_RESPONSE"
-    echo ""
-  fi
-
-  if [[ $HTTP_STATUS -eq 200 || $HTTP_STATUS -eq 201 ]]; then
-    echo "Enable quick deployment successfully"
-  else
-    echo "Failed to enable quick deployment. HTTP status code: $HTTP_STATUS"
-    echo "JSON Response:"
-    echo "$JSON_RESPONSE"
-    exit 1
-  fi
-fi
-
 if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
   echo ""
-  echo '* Get Forge server site workers'
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers"
+  echo '* Get Forge server background processes for this site'
+  API_URL="$API_BASE/background-processes?filter%5Bsite_id%5D=$SITE_ID"
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL GET on $API_URL"
@@ -1062,10 +1194,10 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
 
   JSON_RESPONSE=$(
     curl -s -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
+      -H "$ACCEPT_HEADER" \
       "$API_URL"
   )
-  echo "$JSON_RESPONSE" > workers.json
+  echo "$JSON_RESPONSE" > background-processes.json
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] response JSON:"
@@ -1073,21 +1205,31 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     echo ""
   fi
 
-  # Check if worker exists
-  WORKER_EXISTS=$(jq -r '(.workers | length) > 0' workers.json)
+  # Build the artisan command the worker should run (Forge API v2 replaced the
+  # dedicated "queue worker" resource with a generic "background process" one)
+  WORKER_COMMAND="php artisan queue:work $INPUT_WORKER_CONNECTION --sleep=$INPUT_WORKER_SLEEP --timeout=$INPUT_WORKER_TIMEOUT"
 
-  if [[ $WORKER_EXISTS == 'false' ]]; then
-    echo "Worker not found"
+  if [[ -n "$INPUT_WORKER_TRIES" ]]; then
+    WORKER_COMMAND="$WORKER_COMMAND --tries=$INPUT_WORKER_TRIES"
   fi
 
+  if [[ -n "$INPUT_WORKER_QUEUE" ]]; then
+    WORKER_COMMAND="$WORKER_COMMAND --queue=$INPUT_WORKER_QUEUE"
+  fi
+
+  if [[ "$INPUT_WORKER_FORCE" == "true" ]]; then
+    WORKER_COMMAND="$WORKER_COMMAND --force"
+  fi
+
+  WORKER_EXISTS=$(jq -r '(.data | length) > 0' background-processes.json)
+
   if [[ $WORKER_EXISTS == 'true' ]]; then
-    echo "Worker found"
+    echo "Background process found"
     echo ""
     echo "* Checking review-app worker configuration"
     echo ""
 
-    FIRST_WORKER_DATA=$(jq -r '.workers[0]' workers.json)
-
+    FIRST_WORKER_DATA=$(jq -r '.data[0]' background-processes.json)
     echo "$FIRST_WORKER_DATA" > first_worker.json
     WORKER_ID=$(jq -r '.id' first_worker.json)
 
@@ -1102,39 +1244,14 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     fi
 
     echo "Checking worker (ID $WORKER_ID)"
-    echo "⚠️ PHP version is not checked, in case of update, delete and recreate the review app manually."
 
-    WORKER_CONNECTION_ID=$(jq -r '.connection' first_worker.json)
-    WORKER_TIMEOUT=$(jq -r '.timeout' first_worker.json)
-    WORKER_SLEEP=$(jq -r '.sleep' first_worker.json)
-    WORKER_PROCESSES=$(jq -r '.processes' first_worker.json)
-    WORKER_STOPWAITSECS=$(jq -r '.stopwaitsecs' first_worker.json)
-    WORKER_DAEMON=$(jq -r '.daemon' first_worker.json)
-    WORKER_TRIES=$(jq -r '.tries' first_worker.json)
-
-    if [[ "$WORKER_DAEMON" == "1" ]]; then
-      WORKER_DAEMON='true'
-    else
-      WORKER_DAEMON='false'
-    fi
-
-    WORKER_FORCE=$(jq -r '.force' first_worker.json)
-
-    if [[ "$WORKER_FORCE" == "1" ]]; then
-      WORKER_FORCE='true'
-    else
-      WORKER_FORCE='false'
-    fi
+    WORKER_EXISTING_COMMAND=$(jq -r '.attributes.command' first_worker.json)
+    WORKER_PROCESSES=$(jq -r '.attributes.processes' first_worker.json)
 
     NEED_WORKER_RECREATE='false'
 
-    if [[ "$INPUT_WORKER_CONNECTION" != "$WORKER_CONNECTION_ID" ]]; then
-      echo "Existing worker connection '$WORKER_CONNECTION_ID' is different than the requested '$INPUT_WORKER_CONNECTION' value"
-      NEED_WORKER_RECREATE='true'
-    fi
-
-    if [[ "$INPUT_WORKER_TIMEOUT" != "$WORKER_TIMEOUT" ]]; then
-      echo "Existing worker timeout '$WORKER_TIMEOUT' is different than the requested '$INPUT_WORKER_TIMEOUT' value"
+    if [[ "$WORKER_COMMAND" != "$WORKER_EXISTING_COMMAND" ]]; then
+      echo "Existing worker command '$WORKER_EXISTING_COMMAND' is different than the requested '$WORKER_COMMAND' value"
       NEED_WORKER_RECREATE='true'
     fi
 
@@ -1143,38 +1260,11 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
       NEED_WORKER_RECREATE='true'
     fi
 
-    if [[ "$INPUT_WORKER_STOPWAITSECS" != "$WORKER_STOPWAITSECS" ]]; then
-      echo "Existing worker stopwaitsecs '$WORKER_STOPWAITSECS' is different than the requested '$INPUT_WORKER_STOPWAITSECS' value"
-      NEED_WORKER_RECREATE='true'
-    fi
-
-    if [[ "$INPUT_WORKER_DAEMON" != "$WORKER_DAEMON" ]]; then
-      echo "Existing worker daemon '$WORKER_DAEMON' is different than the requested '$INPUT_WORKER_DAEMON' value"
-      NEED_WORKER_RECREATE='true'
-    fi
-
-    if [[ "$INPUT_WORKER_FORCE" != "$WORKER_FORCE" ]]; then
-      echo "Existing worker force '$WORKER_FORCE' is different than the requested '$INPUT_WORKER_FORCE' value"
-      NEED_WORKER_RECREATE='true'
-    fi
-
-    if [[ -z "$INPUT_WORKER_TRIES" ]]; then
-      if [[ "null" != "$WORKER_TRIES" ]]; then
-        echo "Existing worker tries '$WORKER_TRIES' is different than the requested 'null' value"
-        NEED_WORKER_RECREATE='true'
-      fi
-    else
-      if [[ "$INPUT_WORKER_TRIES" != "$WORKER_TRIES" ]]; then
-        echo "Existing worker tries '$WORKER_TRIES' is different than the requested '$INPUT_WORKER_TRIES' value"
-        NEED_WORKER_RECREATE='true'
-      fi
-    fi
-
     if [[ $NEED_WORKER_RECREATE == 'true' ]]; then
       echo ""
       echo "* Delete existing review-app worker"
 
-      API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers/$WORKER_ID"
+      API_URL="$API_BASE/background-processes/$WORKER_ID"
 
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] CURL DELETE on $API_URL"
@@ -1185,14 +1275,13 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
         curl -s -o delete-existing-site-worker-response.json -w "%{http_code}" \
           -X DELETE \
           -H "$AUTH_HEADER" \
-          -H "Accept: application/json" \
-          -H "Content-Type: application/json" \
+          -H "$ACCEPT_HEADER" \
           "$API_URL"
       )
 
       JSON_RESPONSE=$(cat delete-existing-site-worker-response.json)
 
-      if [[ $HTTP_STATUS -eq 200 ]]; then
+      if [[ $HTTP_STATUS -eq 202 ]]; then
         echo "Worker (ID $WORKER_ID) deleted successfully"
         WORKER_EXISTS='false'
       else
@@ -1208,33 +1297,17 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     echo ""
     echo "* Create review-app worker"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/workers"
+    API_URL="$API_BASE/background-processes"
 
-    JSON_PAYLOAD='{'
+    ESCAPED_WORKER_COMMAND=$(echo "$WORKER_COMMAND" | jq -Rsa .)
 
-    if [[ -n "$INPUT_WORKER_TRIES" ]]; then
-      JSON_PAYLOAD=$JSON_PAYLOAD'
-        "tries": '$INPUT_WORKER_TRIES','
-    fi
-
-    if [[ -n "$INPUT_WORKER_PHP_VERSION" ]]; then
-      JSON_PAYLOAD=$JSON_PAYLOAD'
-        "php_version": "'$INPUT_WORKER_PHP_VERSION'",'
-    fi
-
-    if [[ -n "$INPUT_WORKER_QUEUE" ]]; then
-      JSON_PAYLOAD=$JSON_PAYLOAD'
-        "queue": "'$INPUT_WORKER_QUEUE'",'
-    fi
-
-    JSON_PAYLOAD=$JSON_PAYLOAD'
-      "connection": "'"$INPUT_WORKER_CONNECTION"'",
-      "timeout": '$INPUT_WORKER_TIMEOUT',
-      "sleep": '$INPUT_WORKER_SLEEP',
-      "processes": '$INPUT_WORKER_PROCESSES',
-      "stopwaitsecs": '$INPUT_WORKER_STOPWAITSECS',
-      "daemon": '$INPUT_WORKER_DAEMON',
-      "force": '$INPUT_WORKER_FORCE'
+    JSON_PAYLOAD='{
+      "name": "Queue Worker",
+      "site_id": '"$SITE_ID"',
+      "command": '"$ESCAPED_WORKER_COMMAND"',
+      "user": "forge",
+      "processes": '"$INPUT_WORKER_PROCESSES"',
+      "stopwaitsecs": '"$INPUT_WORKER_STOPWAITSECS"'
     }'
 
     if [[ $DEBUG == 'true' ]]; then
@@ -1247,20 +1320,25 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
       curl -s -o create-site-worker-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
+        -H "$ACCEPT_HEADER" \
+        -H "$CONTENT_TYPE_HEADER" \
         -d "$JSON_PAYLOAD" \
         "$API_URL"
     )
 
     JSON_RESPONSE=$(cat create-site-worker-response.json)
-    if [[ $HTTP_STATUS -eq 200 ]]; then
+    if [[ $HTTP_STATUS -eq 202 ]]; then
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] response JSON:"
         echo "$JSON_RESPONSE"
         echo ""
       fi
-      WORKER_ID=$(jq -r '.worker.id' create-site-worker-response.json)
+      WORKER_ID=$(jq -r '.data.id' create-site-worker-response.json)
+
+      if [[ -n "$GITHUB_ACTIONS" && "$GITHUB_ACTIONS" == "true" ]]; then
+        echo "worker_id=$WORKER_ID" >> $GITHUB_OUTPUT
+      fi
+
       echo "Worker (ID $WORKER_ID) created successfully"
     else
       echo "Failed to create worker. HTTP status code: $HTTP_STATUS"
@@ -1274,7 +1352,7 @@ fi
 if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
   echo ""
   echo '* Get Forge server site security rules'
-  API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules"
+  API_URL="$API_BASE/sites/$SITE_ID/security-rules"
 
   if [[ $DEBUG == 'true' ]]; then
     echo "[DEBUG] CURL GET on $API_URL"
@@ -1283,7 +1361,7 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
 
   JSON_RESPONSE=$(
     curl -s -H "$AUTH_HEADER" \
-      -H "Accept: application/json" \
+      -H "$ACCEPT_HEADER" \
       "$API_URL"
   )
   echo "$JSON_RESPONSE" > security-rules.json
@@ -1295,7 +1373,7 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
   fi
 
   # Check if security rule exists
-  SECURITY_RULE_EXISTS=$(jq -r '(.security_rules | length) > 0' security-rules.json)
+  SECURITY_RULE_EXISTS=$(jq -r '(.data | length) > 0' security-rules.json)
 
   if [[ $SECURITY_RULE_EXISTS == 'false' ]]; then
     echo "Security rule not found"
@@ -1306,12 +1384,12 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
     echo ""
     echo "* Delete existing security rule"
 
-    FIRST_SECURITY_RULE_DATA=$(jq -r '.security_rules[0]' security-rules.json)
+    FIRST_SECURITY_RULE_DATA=$(jq -r '.data[0]' security-rules.json)
 
     echo "$FIRST_SECURITY_RULE_DATA" > first_security_rule.json
     SECURITY_RULE_ID=$(jq -r '.id' first_security_rule.json)
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules/$SECURITY_RULE_ID"
+    API_URL="$API_BASE/sites/$SITE_ID/security-rules/$SECURITY_RULE_ID"
 
     if [[ $DEBUG == 'true' ]]; then
       echo "[DEBUG] CURL DELETE on $API_URL"
@@ -1322,14 +1400,13 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
       curl -s -o delete-existing-site-security-rule-response.json -w "%{http_code}" \
         -X DELETE \
         -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
+        -H "$ACCEPT_HEADER" \
         "$API_URL"
     )
 
     JSON_RESPONSE=$(cat delete-existing-site-security-rule-response.json)
 
-    if [[ $HTTP_STATUS -eq 200 ]]; then
+    if [[ $HTTP_STATUS -eq 202 ]]; then
       echo "Security rule (ID $SECURITY_RULE_ID) deleted successfully"
       SECURITY_RULE_EXISTS='false'
     else
@@ -1344,11 +1421,10 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
     echo ""
     echo "* Create review-app security rule"
 
-    API_URL="https://forge.laravel.com/api/v1/servers/$INPUT_FORGE_SERVER_ID/sites/$SITE_ID/security-rules"
+    API_URL="$API_BASE/sites/$SITE_ID/security-rules"
 
     JSON_PAYLOAD='{
       "name": "Access Restricted",
-      "path": null,
       "credentials": [
         {
           "username": "'"$INPUT_SECURITY_RULE_USERNAME"'",
@@ -1367,20 +1443,20 @@ if [[ $INPUT_SECURITY_RULE_ENABLED == 'true' ]]; then
       curl -s -o create-site-security-rule-response.json -w "%{http_code}" \
         -X POST \
         -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        -H "Content-Type: application/json" \
+        -H "$ACCEPT_HEADER" \
+        -H "$CONTENT_TYPE_HEADER" \
         -d "$JSON_PAYLOAD" \
         "$API_URL"
     )
 
     JSON_RESPONSE=$(cat create-site-security-rule-response.json)
-    if [[ $HTTP_STATUS -eq 200 ]]; then
+    if [[ $HTTP_STATUS -eq 202 ]]; then
       if [[ $DEBUG == 'true' ]]; then
         echo "[DEBUG] response JSON:"
         echo "$JSON_RESPONSE"
         echo ""
       fi
-      SECURITY_RULE_ID=$(jq -r '.security_rule.id' create-site-security-rule-response.json)
+      SECURITY_RULE_ID=$(jq -r '.data.id' create-site-security-rule-response.json)
       echo "Security rule (ID $SECURITY_RULE_ID) created successfully"
     else
       echo "Failed to create security rule. HTTP status code: $HTTP_STATUS"

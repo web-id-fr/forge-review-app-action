@@ -1,0 +1,11 @@
+{
+  "data": {
+    "id": 10,
+    "type": "domains",
+    "attributes": {
+      "name": "1-test-branch",
+      "allow_wildcard_subdomains": false,
+      "www_redirect_type": "none"
+    }
+  }
+}

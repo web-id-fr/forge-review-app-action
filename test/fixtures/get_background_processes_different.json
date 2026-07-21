@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": 5,
+      "type": "background-processes",
+      "attributes": {
+        "name": "Queue Worker",
+        "command": "php artisan queue:work sync",
+        "user": "forge",
+        "processes": 5,
+        "stopwaitsecs": 600
+      }
+    }
+  ]
+}

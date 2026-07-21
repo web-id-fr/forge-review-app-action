@@ -10,3 +10,8 @@ yarn-error.log*
 # Test artifacts
 test/tmp/
 *.tmp
+
+# Local integration testing (docker-compose.yml) - contains real Forge credentials
+.env.testing
+testing/output/*
+!testing/output/.gitkeep

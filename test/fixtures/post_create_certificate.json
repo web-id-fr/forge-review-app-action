@@ -1,0 +1,10 @@
+{
+  "data": {
+    "id": 100,
+    "type": "certificates",
+    "attributes": {
+      "type": "letsencrypt",
+      "status": "installing"
+    }
+  }
+}

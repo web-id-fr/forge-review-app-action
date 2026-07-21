@@ -10,6 +10,9 @@ inputs:
   forge_api_token:
     description: 'Laravel Forge API key'
     required: true
+  forge_organization:
+    description: 'Laravel Forge organization slug'
+    required: true
   forge_server_id:
     description: 'Laravel Forge server ID'
     required: true
@@ -131,10 +134,10 @@ inputs:
     required: false
     default: '600'
   worker_php_version:
-    description: 'Worker PHP version (if creation is requested). `php_version` input value will be used if not defined'
+    description: '(Ignored, no Forge API v2 equivalent) Worker PHP version (if creation is requested).'
     required: false
   worker_daemon:
-    description: 'Worker "daemon" (if creation is requested)'
+    description: '(Ignored, no Forge API v2 equivalent) Worker "daemon" (if creation is requested)'
     required: false
     default: 'true'
   worker_force:
