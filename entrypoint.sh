@@ -151,6 +151,11 @@ if [[ -z "$INPUT_PROJECT_TYPE" ]]; then
   INPUT_PROJECT_TYPE='php'
 fi
 
+# 'html' was a valid site type in the Forge API v1, renamed to 'static-html' in v2.
+if [[ "$INPUT_PROJECT_TYPE" == 'html' ]]; then
+  INPUT_PROJECT_TYPE='static-html'
+fi
+
 if [[ -z "$INPUT_DIRECTORY" ]]; then
   INPUT_DIRECTORY='/public'
 fi
