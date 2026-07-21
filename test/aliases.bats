@@ -57,12 +57,9 @@ setup_alias_mocks() {
     "post_deploy_site.json" \
     "202"
 
-  mock_curl_response \
-    "GET" \
-    "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/deployments/status" \
-    "get_deployment_status_finished.json" \
-    "200"
-
+  # Both the "wait for deployment" poll and the "get last deployment" step
+  # hit this same URL in Forge API v2 (deployments/status only reflects an
+  # in-progress deployment and reverts to null once finished).
   mock_curl_response \
     "GET" \
     "https://forge.laravel.com/api/orgs/test-org/servers/123/sites/1/deployments?sort=-created_at&page%5Bsize%5D=1" \

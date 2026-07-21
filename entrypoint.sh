@@ -959,7 +959,10 @@ fi
 echo ""
 echo "* Wait for deployment"
 
-API_URL="$API_BASE/sites/$SITE_ID/deployments/status"
+# /deployments/status only reflects a deployment currently in progress and
+# reverts to null once it finishes (Forge API v2), so poll the deployments
+# list (most recent first) and check its status instead.
+API_URL="$API_BASE/sites/$SITE_ID/deployments?sort=-created_at&page%5Bsize%5D=1"
 
 start_time=$(date +%s)
 elapsed_time=0
@@ -993,7 +996,7 @@ while [[ "$status" != "finished" && "$status" != "failed" && "$status" != "faile
     exit 1
   fi
 
-  status=$(echo "$JSON_RESPONSE" | jq -r '.data.attributes.status')
+  status=$(echo "$JSON_RESPONSE" | jq -r '.data[0].attributes.status')
 
   if [[ "$status" != "finished" && "$status" != "failed" && "$status" != "failed-build" && "$status" != "cancelled" ]]; then
     echo "Status is $status, retrying in 5 seconds..."
