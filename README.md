@@ -112,6 +112,28 @@ Starting with `v2`, this action uses [Forge API v2](https://forge.laravel.com/ap
 
 Everything else (inputs, outputs, stub files, aliases, security rule, Horizon/Scheduler/quick-deploy integrations) keeps working the same way.
 
+## API token & scopes
+
+The Forge API v2 uses OAuth2-style scopes on API tokens (unlike the v1 legacy tokens, which were unscoped and granted full access to everything the owning account could do). When generating your `forge_api_token` in the [Forge dashboard](https://forge.laravel.com/user-profile/api), select the following scopes so this action can run end-to-end:
+
+The order below matches the order scopes appear in the Forge dashboard's token creation form (server scopes first, then site scopes), to make them easier to tick off:
+
+| Scope                     | Why it's needed                                                                                       |
+|---------------------------|--------------------------------------------------------------------------------------------------------|
+| `server:view`              | List sites, database schemas, nginx templates and background processes; poll deployment status.       |
+| `server:create-databases`   | Create the review-app database (only if `create_database` is `true`).                                  |
+| `server:create-daemons`     | Enable the Horizon integration and create the queue worker (only if `horizon_enabled`/`create_worker` are `true`). |
+| `server:delete-daemons`     | Recreate the queue worker when its configuration changed (only if `create_worker` is `true`).           |
+| `server:create-schedulers`  | Enable the Laravel Scheduler integration (only if `scheduler_enabled` is `true`).                        |
+| `site:create`               | Create the review-app site.                                                                            |
+| `site:meta`                 | List/create site domains, list certificates.                                                           |
+| `site:manage-deploys`       | Enable quick-deploy, update the deploy script, trigger deployments, read deployment logs.               |
+| `site:manage-environment`   | Update the site's `.env` file.                                                                         |
+| `site:manage-security`      | List/create/delete the site security rule (Basic Auth, only if `security_rule_enabled` is `true`).       |
+| `site:manage-ssl`           | Request the Let's Encrypt certificate (only if `letsencrypt_certificate` is `true`).                     |
+
+If you know in advance you won't use a given optional feature (worker, Horizon, Scheduler, security rule, Let's Encrypt), you can omit the corresponding scope(s). Also make sure the token owner has access to the target organization and server.
+
 ## Inputs
 
 It is highly recommended that you store all inputs using [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets) or variables.
