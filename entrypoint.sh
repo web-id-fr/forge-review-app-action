@@ -1306,9 +1306,14 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
 
     ESCAPED_WORKER_COMMAND=$(echo "$WORKER_COMMAND" | jq -Rsa .)
     SITE_ROOT_DIRECTORY=$(jq -r '.attributes.root_directory' site.json)
+    # Background processes are server-scoped and require a unique "name" across
+    # the whole server, so a hardcoded "Queue Worker" collides as soon as another
+    # site (or a legacy v1 worker) on the same server already uses that name.
+    WORKER_NAME="Queue Worker ($INPUT_HOST)"
+    ESCAPED_WORKER_NAME=$(echo "$WORKER_NAME" | jq -Rsa .)
 
     JSON_PAYLOAD='{
-      "name": "Queue Worker",
+      "name": '"$ESCAPED_WORKER_NAME"',
       "site_id": '"$SITE_ID"',
       "directory": "'"$SITE_ROOT_DIRECTORY"'",
       "command": '"$ESCAPED_WORKER_COMMAND"',
