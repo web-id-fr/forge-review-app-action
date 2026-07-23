@@ -253,7 +253,7 @@ if [[ -z "$INPUT_QUICK_DEPLOY_ENABLED" ]]; then
 fi
 
 if [[ -n "$INPUT_WORKER_DAEMON" || -n "$INPUT_WORKER_PHP_VERSION" ]]; then
-  echo "⚠️ 'worker_daemon' and 'worker_php_version' have no equivalent in the Forge API v2 (Background Processes are always supervisor-managed and always use the server's default CLI PHP version). These inputs are ignored."
+  echo "⚠️ 'worker_daemon' and 'worker_php_version' have no equivalent in the Forge API v2 (Background Processes are always supervisor-managed and the worker command now uses the site's own 'php_version' input). These inputs are ignored."
 fi
 
 echo ""
