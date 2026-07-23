@@ -1300,10 +1300,12 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     API_URL="$API_BASE/background-processes"
 
     ESCAPED_WORKER_COMMAND=$(echo "$WORKER_COMMAND" | jq -Rsa .)
+    SITE_ROOT_DIRECTORY=$(jq -r '.attributes.root_directory' site.json)
 
     JSON_PAYLOAD='{
       "name": "Queue Worker",
       "site_id": '"$SITE_ID"',
+      "directory": "'"$SITE_ROOT_DIRECTORY"'",
       "command": '"$ESCAPED_WORKER_COMMAND"',
       "user": "forge",
       "processes": '"$INPUT_WORKER_PROCESSES"',
