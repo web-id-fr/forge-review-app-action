@@ -1309,7 +1309,12 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
     # Background processes are server-scoped and require a unique "name" across
     # the whole server, so a hardcoded "Queue Worker" collides as soon as another
     # site (or a legacy v1 worker) on the same server already uses that name.
-    WORKER_NAME="Queue Worker ($INPUT_HOST)"
+    # Strip the root domain (shared by every review-app site) to keep the name short.
+    if [[ -n "$INPUT_ROOT_DOMAIN" ]]; then
+      WORKER_NAME="Queue Worker ${INPUT_HOST%.$INPUT_ROOT_DOMAIN}"
+    else
+      WORKER_NAME="Queue Worker $INPUT_HOST"
+    fi
     ESCAPED_WORKER_NAME=$(echo "$WORKER_NAME" | jq -Rsa .)
 
     JSON_PAYLOAD='{
