@@ -1206,8 +1206,13 @@ if [[ $INPUT_CREATE_WORKER == 'true' ]]; then
   fi
 
   # Build the artisan command the worker should run (Forge API v2 replaced the
-  # dedicated "queue worker" resource with a generic "background process" one)
-  WORKER_COMMAND="php artisan queue:work $INPUT_WORKER_CONNECTION --sleep=$INPUT_WORKER_SLEEP --timeout=$INPUT_WORKER_TIMEOUT"
+  # dedicated "queue worker" resource with a generic "background process" one).
+  # Background processes always use the server's default CLI PHP version unless
+  # the binary is explicit, so use the site's own PHP version (e.g. "php84" -> "php8.4").
+  PHP_VERSION_DIGITS="${INPUT_PHP_VERSION#php}"
+  PHP_BINARY="php${PHP_VERSION_DIGITS:0:1}.${PHP_VERSION_DIGITS:1:1}"
+
+  WORKER_COMMAND="$PHP_BINARY artisan queue:work $INPUT_WORKER_CONNECTION --sleep=$INPUT_WORKER_SLEEP --timeout=$INPUT_WORKER_TIMEOUT"
 
   if [[ -n "$INPUT_WORKER_TRIES" ]]; then
     WORKER_COMMAND="$WORKER_COMMAND --tries=$INPUT_WORKER_TRIES"
